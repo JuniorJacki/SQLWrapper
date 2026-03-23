@@ -1,6 +1,5 @@
 package de.juniorjacki.utils;
 
-import de.juniorjacki.utils.sql.Database;
 import de.juniorjacki.utils.sql.query.QueryBuilder;
 import de.juniorjacki.utils.sql.structure.Table;
 import de.juniorjacki.utils.sql.type.DatabaseProperty;
@@ -11,26 +10,24 @@ import de.juniorjacki.utils.sql.type.defaultType.STRING;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
-public class TestTable extends Table<TestTable,TestTable.Property, TestTable.Test> implements QueryBuilder<TestTable, TestTable.Property,TestTable.Test> {
+public class TestTable2 extends Table<TestTable2, TestTable2.Property, TestTable2.Test2> implements QueryBuilder<TestTable2, TestTable2.Property, TestTable2.Test2> {
 
     @Override
-    public Class<TestTable.Test> getTableRecord() {
-        return TestTable.Test.class;
+    public Class<Test2> getTableRecord() {
+        return Test2.class;
     }
 
-    public record Test(String preName, String surName, Integer age) implements DatabaseRecord<Test, Property> {
+    public record Test2(String preName, Integer age) implements DatabaseRecord<Test2, Property> {
 
     }
     @Override
     public List<Property> getProperties() {
-        return Arrays.asList(TestTable.Property.values());
+        return Arrays.asList(TestTable2.Property.values());
     }
 
     public enum Property implements DatabaseProperty {
         preName(true, STRING.INSTANCE),
-        surName(false,STRING.INSTANCE),
         age(false,INTEGER.INSTANCE),
         ;
 

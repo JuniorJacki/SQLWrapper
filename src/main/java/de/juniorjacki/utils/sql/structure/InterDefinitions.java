@@ -14,6 +14,9 @@ import java.util.HexFormat;
 
 public class InterDefinitions {
 
+    public static Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn) throws SQLException {
+        return InterDefinitions.getTypedValue(rs,returnColumn,null);
+    }
 
     /**
      * Retrieves a typed value from a ResultSet for the specified column and table.
@@ -25,7 +28,7 @@ public class InterDefinitions {
      * @throws IllegalArgumentException if returnColumn is null
      * @throws SQLException if a database error occurs
      */
-    public static  Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn, Table<?, ?> table) throws SQLException {
+    public static  Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn, Table<?,?, ?> table) throws SQLException {
         if (returnColumn == null) {
             throw new IllegalArgumentException("Return column cannot be null");
         }

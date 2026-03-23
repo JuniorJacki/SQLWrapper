@@ -25,8 +25,8 @@ public class Database extends Connector implements DatabankHandler {
     private AtomicReference<Connection> currentConnection = new AtomicReference<>();
     private AtomicReference<CompletableFuture<Connection>> currentConnectionProcess = new AtomicReference<>();
 
-    private AtomicReference<List<Class<Table<?,?>>>> waitingTables = new AtomicReference<>(new ArrayList<>());
-    private ConcurrentHashMap<Class<Table<?,?>>,Table<?,?>> activeTables = new ConcurrentHashMap<>();
+    private AtomicReference<List<Class<Table<?,?,?>>>> waitingTables = new AtomicReference<>(new ArrayList<>());
+    private ConcurrentHashMap<Class<Table<?,?,?>>,Table<?,?,?>> activeTables = new ConcurrentHashMap<>();
     private RoutineRunner routineRunner = new RoutineRunner();
 
     private boolean isActive() {return currentConnection.get() != null;}
@@ -37,14 +37,14 @@ public class Database extends Connector implements DatabankHandler {
         this.databaseKey = databaseKey;
     }
 
-    public <T extends Table<E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> void registerTable(Class<T> tableClass) throws Exception {
+    public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> void registerTable(Class<T> tableClass) throws Exception {
         if (isInitiated) {
-            activeTables.put((Class<Table<?, ?>>) tableClass,buildDatabaseTable(this,getActiveConnection(), (Class<Table<?, ?>>) tableClass));
-        } else waitingTables.get().add((Class<Table<?, ?>>) tableClass);
+            activeTables.put((Class<Table<?,?, ?>>) tableClass,buildDatabaseTable(this,getActiveConnection(), (Class<Table<?,?, ?>>) tableClass));
+        } else waitingTables.get().add((Class<Table<?,?, ?>>) tableClass);
     }
 
-    public <T extends Table<E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?> getTable(Class<T> tableClass) {
-        return (Table<E, R>) activeTables.get(tableClass);
+    public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?,?> getTable(Class<T> tableClass) {
+        return (Table<T,E, R>) activeTables.get(tableClass);
     }
 
     public void registerNewRoutine(Routine routine) {
@@ -63,7 +63,7 @@ public class Database extends Connector implements DatabankHandler {
             return false;
         }
         try {
-            for (Class<Table<?, ?>> tableClass : waitingTables.get()) {
+            for (Class<Table<?,?, ?>> tableClass : waitingTables.get()) {
                 activeTables.put(tableClass,buildDatabaseTable(this,currentConnection.get(), tableClass));
             }
         } catch (Exception exception) {

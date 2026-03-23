@@ -13,16 +13,29 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
 
-public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & DatabaseProperty,R extends java.lang.Record & DatabaseRecord<R, E>> {
+public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & DatabaseProperty,R extends java.lang.Record & DatabaseRecord<R, E>> {
     G getInstance();
-    Database getDatabase();
 
 
-    default RowQuery<G, R, E> newRowQuery() {
-        return new RowQuery<>(getInstance(),getDatabase());
+    /**
+     * @param returnColumn Column the Query should request from Database
+     */
+    default ColumnQuery<G, R, E> newColumnQuery(E returnColumn) {
+        return new ColumnQuery<>(getInstance(),returnColumn);
     }
 
+    default RowQuery<G, R, E> newRowQuery() {
+        return new RowQuery<>(getInstance());
+    }
+
+    /**
+     * @param returnColumn Columns the Query should request from Database
+     */
+    default ColumnsQuery<G, R, E> newColumnsQuery(E... returnColumn) {
+        return new ColumnsQuery<>(getInstance(), returnColumn);
+    }
     /**
      * Abstract base class for building SQL queries with conditions, grouping, ordering, and limits.
      *
@@ -37,7 +50,6 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
         protected InterDefinitions.Order order;
         protected E groupBy;
         protected final S table;
-        protected final Database database;
 
         /**
          * Constructs a Query with the specified table.
@@ -45,12 +57,11 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
          * @param table The table to query
          * @throws IllegalArgumentException if the table is null
          */
-        protected Query(S table,Database database) {
-            if (table == null || database == null) {
+        protected Query(S table) {
+            if (table == null || table.getDatabase() == null) {
                 throw new IllegalArgumentException("Table or Database cannot be null");
             }
             this.table = table;
-            this.database = database;
         }
 
         /**
@@ -122,7 +133,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
                 parameterSetter.accept(preparedStatement,index,value);
             }
         };
-        record QuerySet(StringBuilder query,Queue<ParameterSet> parameters){};
+        public record QuerySet(StringBuilder query,Queue<ParameterSet> parameters){};
         /**
          * Builds the base SQL query string with the specified select clause.
          * This method constructs the query including conditions, grouping, ordering, and limits.
@@ -137,7 +148,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             if (conditionQuery != null) {
                 ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
                 parameters.addAll(querySet.parameters);
-                query.append(querySet.query);
+                query.append(querySet.query.toString());
             }
             if (groupBy != null) {
                 query.append(" GROUP BY ").append(groupBy.name());
@@ -162,7 +173,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             if (conditionQuery != null) {
                 ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
                 parameters.addAll(querySet.parameters);
-                query.append(querySet.query);
+                query.append(querySet.query.toString());
             }
             if (groupBy != null) {
                 query.append(" GROUP BY ").append(groupBy.name());
@@ -188,7 +199,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
                 QuerySet querySet = buildQueryBase("1");
                 String query = querySet.query.toString();
                 if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-                try (var prepStatement = database.getConnection().get().prepareStatement(query)) {
+                try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
                     for (int i = 0; i < querySet.parameters.size(); i++) {
                        querySet.parameters.poll().set(prepStatement,i+1);
                     }
@@ -213,7 +224,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             QuerySet querySet = buildQueryBase("1");
             String query = querySet.query.toString();
             if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = database.getConnection().get().prepareStatement(query)) {
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
                 for (int i = 0; i < querySet.parameters.size(); i++) {
                     querySet.parameters.poll().set(prepStatement,i+1);
                 }
@@ -230,7 +241,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
         }
     }
 
-    class RowQuery<G extends Table<E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> extends Query<RowQuery<G,R,E>,G, E> {
+    class RowQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> extends Query<RowQuery<G,R,E>,G, E> {
 
         /**
          * Constructs a RowQuery for the specified table.
@@ -238,10 +249,23 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
          * @param table The table to query
          * @throws IllegalArgumentException if the table is null
          */
-        public RowQuery(G table,Database database) {
-            super(table,database);
+        public RowQuery(G table) {
+            super(table);
         }
 
+        /**
+         * Creates a BindingRowQuery to join the current table with another table.
+         *
+         * @param <U> The type of the table to join with
+         * @param <A> The record type of the joined table
+         * @param <I> The enum type representing properties of the joined table
+         * @param joinTable The table to join with
+         * @param bindings The bindings defining the join conditions
+         * @return A new BindingRowQuery instance
+         */
+        public <U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> BindingRowQuery<G, R, E, U, A, I> join(U joinTable, Binding<G, R, E, U, A, I>... bindings) {
+            return new BindingRowQuery<G, R, E, U, A, I>((G) table, buildQueryBase("*"), joinTable, bindings);
+        }
 
 
         /**
@@ -253,7 +277,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             QuerySet querySet =buildQueryBase("*");
             String query = querySet.query.toString();
             if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = database.getConnection().get().prepareStatement(query)) {
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
                 for (int i = 0; i < querySet.parameters.size(); i++) {
                     querySet.parameters.poll().set(prepStatement,i+1);
                 }
@@ -280,7 +304,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             StringBuilder query = querySet.query;
             query.insert(0, "DELETE");
             if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = database.getConnection().get().prepareStatement(query.toString())) {
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query.toString())) {
                 for (int i = 0; i < querySet.parameters.size(); i++) {
                     querySet.parameters.poll().set(prepStatement,i+1);
                 }
@@ -306,6 +330,536 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
             }
         }
     }
+
+    /**
+     * A utility class to encapsulate a set of columns to be selected from a table.
+     *
+     * @param <I> The enum type representing properties of the table
+     */
+    class ResultColumns<I> {
+        HashSet<I> resultColumns;
+
+        /**
+         * Constructs a ResultColumns instance with the specified columns.
+         *
+         * @param resultColumns The columns to include
+         */
+        @SafeVarargs
+        public ResultColumns(I... resultColumns) {
+            this.resultColumns = resultColumns == null ? null : new HashSet<>(Arrays.asList(resultColumns));
+        }
+
+        /**
+         * Returns the immutable set of columns.
+         *
+         * @return An immutable Set of columns
+         */
+        public HashSet<I> getHashSet() {
+            return resultColumns;
+        }
+    }
+
+    /**
+     * A query class for retrieving a single column from a table.
+     * This class extends Query to support selecting a specific column with optional conditions,
+     * grouping, ordering, and limits.
+     *
+     * @param <G> The type of the table
+     * @param <R> The record type associated with the table
+     * @param <E> The enum type representing properties of the table
+     */
+    class ColumnQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> extends Query<ColumnQuery<G, R, E>,G, E> {
+        private final E returnColumn;
+
+        /**
+         * Constructs a ColumnQuery for selecting a specific column from a table.
+         *
+         * @param table The table to query
+         * @param returnColumn The column to select
+         */
+        public ColumnQuery(G table, E returnColumn) {
+            super(table);
+            this.returnColumn = returnColumn;
+        }
+
+
+        /**
+         * Creates a BindingColumnsQuery to join the current table with another table,
+         * selecting specific columns from both tables.
+         *
+         * @param <U> The type of the table to join with
+         * @param <A> The record type of the joined table
+         * @param <I> The enum type representing properties of the joined table
+         * @param joinTable The table to join with
+         * @param resultColumns The columns to select from the joined table
+         * @param bindings The bindings defining the join conditions
+         * @return A new BindingColumnsQuery instance
+         * @throws IllegalArgumentException if joinTable or joinResultColumns is null, or if bindings are empty
+         */
+        public <U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> BindingColumnsQuery<G, R, E, U, A, I> join(U joinTable, ResultColumns<I> resultColumns, Binding<G, R, E, U, A, I>... bindings) {
+            if (bindings.length == 0) {
+                throw new IllegalArgumentException("At least one binding is required");
+            }
+            return new BindingColumnsQuery<>(table, buildQueryBase(returnColumn.name()), joinTable, new HashSet<>(Arrays.asList(returnColumn)),resultColumns.getHashSet(), bindings);
+        }
+
+        /**
+         * Executes the query and returns a list of values for the selected column.
+         *
+         * @return An Optional containing a list of values for the selected column,
+         *         or empty if an error occurs
+         */
+        public Optional<List<Object>> execute() {
+            QuerySet querySet =buildQueryBase(returnColumn.name());
+            String query = querySet.query.toString();
+            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
+                for (int i = 0; i < querySet.parameters.size(); i++) {
+                    querySet.parameters.poll().set(prepStatement,i+1);
+                }
+                try (ResultSet rs = prepStatement.executeQuery()) {
+                    List<Object> results = new ArrayList<>();
+                    while (rs.next()) {
+                        results.add(InterDefinitions.getTypedValue(rs, returnColumn));
+                    }
+                    return Optional.ofNullable(results.isEmpty() ? null : results);
+                }
+            } catch (Exception e) {
+                throwDBError(e);
+                return Optional.empty();
+            }
+        }
+
+
+        /**
+         * Executes the query and returns the first value of the selected column.
+         *
+         * @return An Optional containing the first value of the selected column,
+         *         or empty if no rows exist or an error occurs
+         */
+        public Optional<Object> executeOne() {
+            int cLimit = limit;
+            try {
+                this.limitBy(1);
+                return execute().map(List::getFirst);
+            } finally {
+                this.limitBy(cLimit);
+            }
+        }
+    }
+
+
+    class ColumnsQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty>
+            extends Query<ColumnsQuery<G, R, E>,G, E> {
+        private final Set<E> returnColumns;
+
+        /**
+         * Constructs a ColumnsQuery for selecting specific columns from a table.
+         *
+         * @param table The table to query
+         * @param returnColumns The columns to select
+         * @throws IllegalArgumentException if table or returnColumns is null, contains null elements, or contains invalid properties
+         */
+        @SafeVarargs
+        public ColumnsQuery(G table, E... returnColumns) {
+            super(table);
+            if (returnColumns == null) {
+                throw new IllegalArgumentException("Return columns cannot be null");
+            }
+            if (Arrays.stream(returnColumns).anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("Return columns cannot contain null elements");
+            }
+            this.returnColumns = Set.of(returnColumns);
+        }
+
+
+        /**
+         * Creates a BindingColumnsQuery to join the current table with another table,
+         * selecting specific columns from both tables.
+         *
+         * @param <U> The type of the table to join with
+         * @param <A> The record type of the joined table
+         * @param <I> The enum type representing properties of the joined table
+         * @param joinTable The table to join with
+         * @param resultColumns The columns to select from the joined table
+         * @param bindings The bindings defining the join conditions
+         * @return A new BindingColumnsQuery instance
+         */
+        public <U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> BindingColumnsQuery<G, R, E, U, A, I> join(U joinTable, ResultColumns<I> resultColumns, Binding<G, R, E, U, A, I>... bindings) {
+            if (bindings.length == 0) {
+                throw new IllegalArgumentException("At least one binding is required");
+            }
+            return new BindingColumnsQuery<>(table, buildQueryBase(String.join(",", returnColumns.stream().map(E::name).toArray(String[]::new))), joinTable, new HashSet<E>(returnColumns),resultColumns.getHashSet(), bindings);
+        }
+
+
+
+
+        /**
+         * Executes the query and returns a list of maps containing the selected column values.
+         *
+         * @return An Optional containing a list of maps with column values,
+         *         or empty if an error occurs
+         */
+        public Optional<List<Map<E, Object>>> execute() {
+            QuerySet querySet =buildQueryBase(String.join(",", returnColumns.stream().map(E::name).toArray(String[]::new)));
+            String query = querySet.query.toString();
+            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
+                for (int i = 0; i < querySet.parameters.size(); i++) {
+                    querySet.parameters.poll().set(prepStatement,i+1);
+                }
+                try (ResultSet rs = prepStatement.executeQuery()) {
+                    List<Map<E, Object>> results = new ArrayList<>();
+                    while (rs.next()) {
+                        Map<E, Object> row = new HashMap<>();
+                        for (E column : returnColumns) {
+                            row.put(column, InterDefinitions.getTypedValue(rs, column));
+                        }
+                        results.add(row);
+                    }
+                    return Optional.ofNullable(results.isEmpty() ? null : results);
+                }
+            } catch (Exception e) {
+                throwDBError(e);
+                return Optional.empty();
+            }
+        }
+
+        /**
+         * Executes the query and returns the first row of selected column values.
+         * Optimizes the query by directly applying LIMIT 1.
+         *
+         * @return An Optional containing a map with the first row's column values,
+         *         or empty if no rows exist or an error occurs
+         */
+        public Optional<Map<E, Object>> executeOne() {
+            int cLimit = limit;
+            try {
+                this.limitBy(1);
+                return execute().map(List::getFirst);
+            } finally {
+                this.limitBy(cLimit);
+            }
+        }
+    }
+
+
+
+    /**
+     * A query class for retrieving specific columns from 2 tables.
+     * This class extends Query to support joins between a reference table and a binding table,
+     * selecting only the specified columns from each table.
+     *
+     * @param <G> The type of the reference table
+     * @param <R> The record type associated with the reference table
+     * @param <E> The enum type representing properties of the reference table
+     * @param <U> The type of the binding table
+     * @param <A> The record type associated with the binding table
+     * @param <I> The enum type representing properties of the binding table
+     */
+    class BindingColumnsQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty,U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> extends Query<BindingRowQuery<G,R,E,U,A,I>,U, I> {
+        private final Table<?,?, ?> refTable;
+        private final QuerySet refTableQueryBase;
+        private final Table<?,?, ?> bindingTable;
+        private final List<Binding<G,R,E,U,A,I>> bindings;
+        private final Set<E> refColumns;
+        private final Set<I> bindingColumns;
+
+
+        /**
+         * Constructs a BindingColumnsQuery for joining two tables and selecting specific columns.
+         *
+         * @param current The reference table
+         * @param refTableQueryBase The base query for the reference table (as a subquery)
+         * @param bindingTable The table to join with
+         * @param refColumns The columns to select from the reference table
+         * @param bindingColumns The columns to select from the binding table
+         * @param bindings The bindings defining the join conditions
+         * @throws IllegalArgumentException if any parameter is null or if bindings are empty
+         */
+        public BindingColumnsQuery(G current, QuerySet refTableQueryBase, U bindingTable, HashSet<E> refColumns, HashSet<I> bindingColumns, Binding<G,R,E,U,A,I>... bindings) {
+            super(bindingTable);
+            if (current == null || refTableQueryBase == null || bindingTable == null || refColumns == null || bindingColumns == null) {
+                throw new IllegalArgumentException("Parameters cannot be null");
+            }
+            if (current.getDatabase() != bindingTable.getDatabase()) {
+                throw new IllegalArgumentException("Ref database does not match binding table database");
+            }
+            if (bindings.length == 0) {
+                throw new IllegalArgumentException("At least one binding is required");
+            }
+            this.refTable = current;
+            this.refTableQueryBase = refTableQueryBase;
+            this.bindingTable = bindingTable;
+            this.refColumns = refColumns;
+            this.bindingColumns =bindingColumns;
+            this.bindings = Arrays.asList(bindings);
+        }
+
+        /**
+         * Builds the base SQL query string for joining the reference and binding tables,
+         * selecting only the specified columns.
+         *
+         * @param selectClause The SQL SELECT clause (ignored, as columns are predefined)
+         * @return A StringBuilder containing the constructed SQL query
+         * @throws IllegalStateException if no valid bindings are present
+         */
+        @Override
+        protected QuerySet buildQueryBase(String selectClause) {
+            StringBuilder query = new StringBuilder("SELECT ");
+            List<CharSequence> columns = new ArrayList<>();
+            columns.addAll(refColumns.stream()
+                    .map(p -> refTable.tableName() + "." + p.name())
+                    .toList());
+            columns.addAll(bindingColumns.stream()
+                    .map(p -> bindingTable.tableName() + "." + p.name())
+                    .toList());
+            if (columns.isEmpty()) {
+                throw new IllegalStateException("No columns specified for selection");
+            }
+            query.append(String.join(", ", columns));
+
+            // FROM clause with refTableQueryBase as subquery and INNER JOIN
+            Queue<ParameterSet> parameters = new LinkedList<>(refTableQueryBase.parameters);
+            query.append(" FROM (").append(refTableQueryBase.query()).append(") AS ")
+                    .append(refTable.tableName())
+                    .append(" INNER JOIN ").append(bindingTable.tableName())
+                    .append(" ON ");
+
+            // Join conditions
+            String joinConditions = bindings.stream()
+                    .filter(b -> b.getRef() != null && b.getJoinRef() != null)
+                    .map(b -> refTable.tableName() + "." + b.getRef().name() + " = " +
+                            bindingTable.tableName() + "." + b.getJoinRef().name())
+                    .collect(Collectors.joining(" AND "));
+            if (joinConditions.isEmpty()) {
+                throw new IllegalStateException("No valid bindings for the join");
+            }
+            query.append(joinConditions);
+
+            // Additional conditions
+            if (conditionQuery != null) {
+                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
+                parameters.addAll(querySet.parameters);
+                query.append(querySet.query.toString());
+            }
+            if (groupBy != null) {
+                query.append(" GROUP BY ").append(groupBy.name());
+            }
+            if (orderBy != null) {
+                query.append(" ORDER BY ").append(orderBy.name()).append(" ").append(order.sql);
+            }
+            if (limit != -1) {
+                query.append(" LIMIT ").append(limit);
+            }
+
+            return new QuerySet(query,parameters);
+        }
+
+        /**
+         * Executes the query and returns a map of column values from the reference table
+         * to column values from the binding table.
+         *
+         * @return An Optional containing a HashMap mapping reference table column values
+         *         to binding table column values, or empty if an error occurs
+         */
+        public Optional<HashMap<HashMap<E, Object>, HashMap<I, Object>>> execute() {
+            QuerySet querySet =buildQueryBase("*");
+            String query = querySet.query.toString();
+            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
+                for (int i = 0; i < querySet.parameters.size(); i++) {
+                    querySet.parameters.poll().set(prepStatement,i+1);
+                }
+                try (ResultSet rs = prepStatement.executeQuery()) {
+                    HashMap<HashMap<E, Object>, HashMap<I, Object>> result = new HashMap<>();
+                    while (rs.next()) {
+                        HashMap<E, Object> refRow = new HashMap<>();
+                        for (E column : refColumns) {
+                            refRow.put(column, InterDefinitions.getTypedValue(rs, column, refTable));
+                        }
+                        HashMap<I, Object> bindingRow = new HashMap<>();
+                        for (I column : bindingColumns) {
+                            bindingRow.put(column, InterDefinitions.getTypedValue(rs, column, bindingTable));
+                        }
+                        result.put(refRow, bindingRow);
+                    }
+                    return Optional.ofNullable(result.isEmpty() ? null : result);
+                }
+            } catch (Exception e) {
+                throwDBError(e);
+                return Optional.empty();
+            }
+        }
+
+        /**
+         * Executes the query and returns the first matching row as a map entry.
+         *
+         * @return An Optional containing the first map entry of reference table column values
+         *         to binding table column values, or empty if no rows exist or an error occurs
+         */
+        public Optional<Map.Entry<HashMap<E, Object>, HashMap<I, Object>>> executeOneRow() {
+            int cLimit = limit;
+            try {
+                this.limitBy(1);
+                return execute().filter(map -> !map.isEmpty()).map(map -> map.entrySet().iterator().next());
+            } finally {
+                this.limitBy(cLimit);
+            }
+        }
+    }
+
+    /**
+     * A query class for retrieving entire rows from two joined tables.
+     * This class extends Query to support joins between a reference table and a binding table,
+     * returning complete records from both tables.
+     *
+     * @param <G> The type of the reference table
+     * @param <R> The record type associated with the reference table
+     * @param <E> The enum type representing properties of the reference table
+     * @param <U> The type of the binding table
+     * @param <A> The record type associated with the binding table
+     * @param <I> The enum type representing properties of the binding table
+     */
+    class BindingRowQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty,U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> extends Query<BindingRowQuery<G,R,E,U,A,I>, U,I> {
+        private final G refTable;
+        private final QuerySet refTableQueryBase;
+        private final List<Binding<G, R, E, U, A, I>> bindings;
+
+        /**
+         * Constructs a BindingRowQuery for joining two tables.
+         *
+         * @param current The reference table
+         * @param refTableQueryBase The base query for the reference table (as a subquery)
+         * @param bindingTable The table to join with
+         * @param bindings The bindings defining the join conditions
+         * @throws IllegalArgumentException if any parameter is null or if bindings are empty
+         */
+        public BindingRowQuery(G current, QuerySet refTableQueryBase, U bindingTable, Binding<G, R, E, U, A, I>... bindings) {
+            super(bindingTable);
+            if (current == null || refTableQueryBase == null || bindingTable == null) {
+                throw new IllegalArgumentException("Parameters cannot be null");
+            }
+            if (current.getDatabase() != bindingTable.getDatabase()) {
+                throw new IllegalArgumentException("Ref database does not match binding table database");
+            }
+            if (bindings.length == 0) {
+                throw new IllegalArgumentException("At least one binding is required");
+            }
+            this.refTable = current;
+            this.refTableQueryBase = refTableQueryBase;
+            this.bindings = List.of(bindings); // Immutable list for efficiency
+        }
+
+        /**
+         * Builds the base SQL query string for joining the reference and binding tables,
+         * selecting all columns from both tables.
+         *
+         * @param selectClause The SQL SELECT clause (ignored, as all columns are selected)
+         * @return A StringBuilder containing the constructed SQL query
+         * @throws IllegalStateException if no valid bindings are present
+         */
+        @Override
+        protected QuerySet buildQueryBase(String selectClause) {
+            StringBuilder query = new StringBuilder("SELECT ");
+            // Combine column names from refTable and bindingTable
+            List<CharSequence> columns = new ArrayList<>();
+            columns.addAll(refTable.getProperties().stream()
+                    .map(p -> refTable.tableName() + "." + p.name())
+                    .toList());
+            columns.addAll(this.table.getProperties().stream()
+                    .map(p -> this.table.tableName() + "." + p.name())
+                    .toList());
+            if (columns.isEmpty()) {
+                throw new IllegalStateException("No columns available for selection");
+            }
+            query.append(String.join(", ", columns));
+
+            // FROM clause with refTableQueryBase as subquery and INNER JOIN
+            query.append(" FROM (").append(refTableQueryBase.query).append(") AS ")
+                    .append(refTable.tableName())
+                    .append(" INNER JOIN ").append(this.table.tableName())
+                    .append(" ON ");
+            Queue<ParameterSet> parameters = new LinkedList<>(refTableQueryBase.parameters);
+
+            // Join conditions
+            String joinConditions = bindings.stream()
+                    .filter(b -> b.getRef() != null && b.getJoinRef() != null)
+                    .map(b -> refTable.tableName() + "." + b.getRef().name() + " = " +
+                            this.table.tableName() + "." + b.getJoinRef().name())
+                    .collect(Collectors.joining(" AND "));
+            if (joinConditions.isEmpty()) {
+                throw new IllegalStateException("No valid bindings for the join");
+            }
+            query.append(joinConditions);
+
+            // Additional conditions
+
+            if (conditionQuery != null) {
+                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
+                parameters.addAll(querySet.parameters);
+                query.append(querySet.query.toString());
+            }
+
+            if (groupBy != null) {
+                query.append(" GROUP BY ").append(groupBy.name());
+            }
+            if (orderBy != null) {
+                query.append(" ORDER BY ").append(orderBy.name()).append(" ").append(order.sql);
+            }
+            if (limit != -1) {
+                query.append(" LIMIT ").append(limit);
+            }
+
+            return new QuerySet(query, parameters);
+        }
+
+        /**
+         * Executes the query and returns a map of reference table records to binding table records.
+         *
+         * @return An Optional containing a HashMap mapping reference table records to binding table records,
+         *         or empty if an error occurs
+         */
+        public Optional<HashMap<R, A>> execute() {
+            QuerySet querySet =buildQueryBase("*");
+            String query = querySet.query.toString();
+            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
+            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
+                for (int i = 0; i < querySet.parameters.size(); i++) {
+                    querySet.parameters.poll().set(prepStatement,i+1);
+                }
+                try (ResultSet rs = prepStatement.executeQuery()) {
+                    HashMap<R, A> rows = new HashMap<>();
+                    while (rs.next()) {
+                        rows.put((R) DatabaseRecord.populateRecord(refTable, rs,true),(A)DatabaseRecord.populateRecord(this.table, rs,true));
+                    }
+                    return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                }
+            } catch (Exception e) {
+                throwDBError(e);
+                return Optional.empty();
+            }
+        }
+
+        /**
+         * Executes the query and returns the first matching row as a map entry.
+         * Optimizes the query by directly applying LIMIT 1.
+         *
+         * @return An Optional containing the first map entry of reference table record to binding table record,
+         *         or empty if no rows exist or an error occurs
+         */
+        public Optional<Map.Entry<R, A>> executeOneRow() {
+            int cLimit = limit;
+            try {
+                this.limitBy(1);
+                return execute().filter(map -> !map.isEmpty()).map(map -> map.entrySet().iterator().next());
+            } finally {
+                this.limitBy(cLimit);
+            }
+        }
+    }
+
 
     class ConditionQueryBuilder<E extends Enum<E> & DatabaseProperty> implements Cloneable {
         Condition<E> initalCondition;
@@ -416,7 +970,7 @@ public interface QueryBuilder<G extends Table<E, R>,  E extends Enum<E> & Databa
      * @param <A> The type of the record for the joined table, extending {@link Record} and {@link DatabaseRecord}.
      * @param <I> The enum type for the joined table's properties, implementing {@link DatabaseProperty}.
      */
-    class Binding<G extends Table<E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty,U extends Table<I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> {
+    class Binding<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty,U extends Table<U,I, A>, A extends java.lang.Record & DatabaseRecord<A, I>, I extends Enum<I> & DatabaseProperty> {
         E ref;
         I joinref;
 

@@ -23,8 +23,9 @@ public interface DatabankHandler {
      * @param con
      * @return
      */
-    default <T extends Table<E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?> buildDatabaseTable(Database database, Connection con, Class<Table<?, ?>> tableClass) throws Exception {
-        Table<?,?> table = tableClass.getDeclaredConstructor(Database.class).newInstance(database);
+    default <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?,?> buildDatabaseTable(Database database, Connection con, Class<Table<?,?, ?>> tableClass) throws Exception {
+        Table<?,?,?> table = tableClass.getDeclaredConstructor().newInstance();
+        table.setDatabase(database);
         con.createStatement().execute(generateCreateTableQuery(table.tableName(),table.tableProperties()));
         if (isTableEmpty(con, table.tableName())) table.onCreation();
         return table;

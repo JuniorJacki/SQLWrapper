@@ -8,11 +8,23 @@ import de.juniorjacki.utils.sql.type.DatabaseType;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class Table<E extends Enum<E> & DatabaseProperty,R extends Record & DatabaseRecord<R,E>> {
-    public final Database database;
-    public Table(Database database) {
-        this.database = database;
+public abstract class Table<T extends Table<T,E, R>,E extends Enum<E> & DatabaseProperty,R extends Record & DatabaseRecord<R,E>> {
+    public Database getDatabase() {
+        return database;
     }
+
+    public T getInstance()
+    {
+        return (T) this;
+    }
+
+    private Database database;
+
+    /**
+     * Init Method (Final)
+     * @param database Database to init this Table to
+     */
+    public void setDatabase(Database database) {if (this.database == null) this.database = database;}
     public String tableName() {
         return getTableRecord().getSimpleName();
     }

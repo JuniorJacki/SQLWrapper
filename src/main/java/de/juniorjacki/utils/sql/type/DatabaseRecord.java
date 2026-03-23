@@ -15,8 +15,9 @@ import static de.juniorjacki.utils.sql.structure.InterDefinitions.setConstructor
 
 public interface DatabaseRecord<T, F extends Enum<F> & DatabaseProperty> {
 
-    T getInstance();
-
+    default T getInstance() {
+        return (T)this;
+    }
     /**
      * Returns updated Record
      * @param field    Field of Datatable
@@ -72,7 +73,7 @@ public interface DatabaseRecord<T, F extends Enum<F> & DatabaseProperty> {
     }
 
 
-    public static <T extends Table<E, ?>, E extends Enum<E> & DatabaseProperty> Object populateRecord(T table, ResultSet resultSet, boolean bindingResult) throws Exception {
+    public static <T extends Table<T,E, ?>, E extends Enum<E> & DatabaseProperty> Object populateRecord(T table, ResultSet resultSet, boolean bindingResult) throws Exception {
         Class<?> recordClass = table.getTableRecord();
 
         // Get the constructor of the record class
@@ -106,7 +107,7 @@ public interface DatabaseRecord<T, F extends Enum<F> & DatabaseProperty> {
 
 
 
-    public static <T extends Table<E, ?>, E extends Enum<E> & DatabaseProperty> Object populateRecord(T table, ResultSet resultSet) throws Exception {
+    public static <T extends Table<T,E, ?>, E extends Enum<E> & DatabaseProperty> Object populateRecord(T table, ResultSet resultSet) throws Exception {
         return populateRecord(table, resultSet, false);
     }
 
