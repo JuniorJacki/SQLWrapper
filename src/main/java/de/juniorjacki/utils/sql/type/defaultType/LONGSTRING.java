@@ -7,7 +7,7 @@ import java.util.List;
 
 public class LONGSTRING extends DatabaseType {
     public LONGSTRING() {
-        super(String.class, List.of(CharSequence.class),
+        super(String.class,
                 ResultSet::getString,
                 (ps, idx, val) -> ps.setString(idx, (String) val),
                 (extendedLength) -> "LONGTEXT");

@@ -1,13 +1,11 @@
 package de.juniorjacki.utils.sql.query;
 
 import de.juniorjacki.utils.SQL;
-import de.juniorjacki.utils.sql.Database;
 import de.juniorjacki.utils.sql.structure.InterDefinitions;
 import de.juniorjacki.utils.sql.structure.Table;
 import de.juniorjacki.utils.sql.type.DatabaseProperty;
 import de.juniorjacki.utils.sql.type.DatabaseRecord;
 import de.juniorjacki.utils.sql.type.DatabaseType;
-import org.apache.logging.log4j.LogManager;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -20,7 +18,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
 
 
     /**
-     * @param returnColumn Column the Query should request from Database
+     * @param returnColumn Column the Query should request or edit
      */
     default ColumnQuery<G, R, E> newColumnQuery(E returnColumn) {
         return new ColumnQuery<>(getInstance(),returnColumn);
@@ -31,11 +29,35 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
     }
 
     /**
-     * @param returnColumn Columns the Query should request from Database
+     * @param returnColumn Columns the Query should request or edit
      */
     default ColumnsQuery<G, R, E> newColumnsQuery(E... returnColumn) {
         return new ColumnsQuery<>(getInstance(), returnColumn);
     }
+
+
+    default boolean insert(R rowData) {
+        try {
+            List<E> properties = getInstance().getProperties();
+            String query = String.format("INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s;",
+                    getInstance().tableName(),
+                    properties.stream().map(Enum::name).collect(Collectors.joining(", ")),
+                    properties.stream().map(p -> "?").collect(Collectors.joining(", ")),
+                    properties.stream().map(p -> p.name() + " = VALUES(" + p.name() + ")").collect(Collectors.joining(", "))
+            );
+            logQuery(query);
+            return getInstance().getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (PreparedStatement prepStatement = connection.prepareStatement(query)) {
+                    InterDefinitions.setParameters(prepStatement, rowData, properties);
+                    return prepStatement.executeUpdate() > 0;
+                }
+            });
+        }  catch (Exception e) {
+            throwDBError(e);
+            return false;
+        }
+    }
+
     /**
      * Abstract base class for building SQL queries with conditions, grouping, ordering, and limits.
      *
@@ -167,8 +189,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return A StringBuilder containing the constructed SQL query
          */
-        protected QuerySet buildBase() {
-            StringBuilder query = new StringBuilder(" FROM ").append(table.tableName()).append(" ");
+        protected QuerySet buildBase(boolean withTable) {
+            StringBuilder query = withTable ? new StringBuilder(" FROM ").append(table.tableName()).append(" ") : new StringBuilder(" ");
             Queue<ParameterSet> parameters = new LinkedList<>();
             if (conditionQuery != null) {
                 ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
@@ -192,24 +214,26 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return true if at least one row exists, false otherwise
          */
-        public boolean exists() {
+        public boolean exists() throws Exception {
             int cLimit = limit;
             try {
                 limitBy(1);
                 QuerySet querySet = buildQueryBase("1");
-                String query = querySet.query.toString();
-                if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-                try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
-                       querySet.parameters.poll().set(prepStatement,i+1);
+                String query = querySet.query.append(";").toString();
+                logQuery(query);
+                return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                    try (var prepStatement = connection.prepareStatement(query)) {
+                        for (int i = 0; i < querySet.parameters.size(); i++) {
+                           querySet.parameters.poll().set(prepStatement,i+1);
+                        }
+                        try (ResultSet rs = prepStatement.executeQuery()) {
+                            return rs.next();
+                        }
+                    } catch (Exception e) {
+                        throwDBError(e);
+                        return false;
                     }
-                    try (ResultSet rs = prepStatement.executeQuery()) {
-                        return rs.next();
-                    }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return false;
-                }
+                });
             } finally {
                 limitBy(cLimit);
             }
@@ -220,24 +244,26 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return The number of matching rows as a long
          */
-        public long count() {
+        public long count() throws Exception {
             QuerySet querySet = buildQueryBase("1");
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getLong(1);
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement,i+1);
                     }
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        if (rs.next()) {
+                            return rs.getLong(1);
+                        }
+                    }
+                    return 0L;
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return 0L;
                 }
-                return 0L;
-            } catch (Exception e) {
-                throwDBError(e);
-                return 0L;
-            }
+            });
         }
     }
 
@@ -252,6 +278,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         public RowQuery(G table) {
             super(table);
         }
+
 
         /**
          * Creates a BindingRowQuery to join the current table with another table.
@@ -268,30 +295,33 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         }
 
 
+
         /**
          * Executes the query and returns all matching rows as a list of records.
          *
          * @return An Optional containing the list of records, or empty if an error occurs
          */
-        public Optional<List<R>> execute() {
+        public Optional<List<R>> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    List<R> rows = new ArrayList<>();
-                    while (rs.next()) {
-                        rows.add((R) DatabaseRecord.populateRecord(table, rs));
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
                     }
-                    return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        List<R> rows = new ArrayList<>();
+                        while (rs.next()) {
+                            rows.add((R) DatabaseRecord.populateRecord(table, rs));
+                        }
+                        return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                    }
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return Optional.empty();
                 }
-            } catch (Exception e) {
-                throwDBError(e);
-                return Optional.empty();
-            }
+            });
         }
 
         /**
@@ -299,20 +329,22 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return Amount of Rows affected
          */
-        public int delete() {
-            QuerySet querySet = buildBase();
-            StringBuilder query = querySet.query;
+        public int delete() throws Exception {
+            QuerySet querySet = buildBase(true);
+            StringBuilder query = querySet.query.append(";");
             query.insert(0, "DELETE");
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query.toString())) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query.toString())) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
+                    }
+                    return prepStatement.executeUpdate();
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return 0;
                 }
-                return prepStatement.executeUpdate();
-            } catch (Exception e) {
-                throwDBError(e);
-                return 0;
-            }
+            });
         }
 
         /**
@@ -320,7 +352,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return An Optional containing the first record, or empty if no rows exist or an error occurs
          */
-        public Optional<R> executeOneRow() {
+        public Optional<R> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -369,17 +401,17 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
      * @param <E> The enum type representing properties of the table
      */
     class ColumnQuery<G extends Table<G,E, R>, R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> extends Query<ColumnQuery<G, R, E>,G, E> {
-        private final E returnColumn;
+        private final E scopeColumn;
 
         /**
          * Constructs a ColumnQuery for selecting a specific column from a table.
          *
          * @param table The table to query
-         * @param returnColumn The column to select
+         * @param scopeColumn The column to select
          */
-        public ColumnQuery(G table, E returnColumn) {
+        public ColumnQuery(G table, E scopeColumn) {
             super(table);
-            this.returnColumn = returnColumn;
+            this.scopeColumn = scopeColumn;
         }
 
 
@@ -400,7 +432,32 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             if (bindings.length == 0) {
                 throw new IllegalArgumentException("At least one binding is required");
             }
-            return new BindingColumnsQuery<>(table, buildQueryBase(returnColumn.name()), joinTable, new HashSet<>(Arrays.asList(returnColumn)),resultColumns.getHashSet(), bindings);
+            return new BindingColumnsQuery<>(table, buildQueryBase(scopeColumn.name()), joinTable, new HashSet<>(Arrays.asList(scopeColumn)),resultColumns.getHashSet(), bindings);
+        }
+
+
+        /**
+         * Updates the Column
+         *
+         * @return Amount of Rows affected
+         */
+        public int update(Object newValue) throws Exception {
+            QuerySet querySet = buildBase(false);
+            StringBuilder query = querySet.query.append(";");
+            query.insert(0, "UPDATE " + table.tableName() + " SET " + scopeColumn.name() + " = ? ");
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query.toString())) {
+                    scopeColumn.getType().getSetData().accept(prepStatement, 1, newValue);
+                    for (int i = 1; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
+                    }
+                    return prepStatement.executeUpdate();
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return 0;
+                }
+            });
         }
 
         /**
@@ -409,25 +466,27 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of values for the selected column,
          *         or empty if an error occurs
          */
-        public Optional<List<Object>> execute() {
-            QuerySet querySet =buildQueryBase(returnColumn.name());
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    List<Object> results = new ArrayList<>();
-                    while (rs.next()) {
-                        results.add(InterDefinitions.getTypedValue(rs, returnColumn));
+        public Optional<List<Object>> execute() throws Exception {
+            QuerySet querySet =buildQueryBase(scopeColumn.name());
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
                     }
-                    return Optional.ofNullable(results.isEmpty() ? null : results);
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        List<Object> results = new ArrayList<>();
+                        while (rs.next()) {
+                            results.add(InterDefinitions.getTypedValue(rs, scopeColumn));
+                        }
+                        return Optional.ofNullable(results.isEmpty() ? null : results);
+                    }
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return Optional.empty();
                 }
-            } catch (Exception e) {
-                throwDBError(e);
-                return Optional.empty();
-            }
+            });
         }
 
 
@@ -437,7 +496,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first value of the selected column,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Object> executeOne() {
+        public Optional<Object> executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -446,6 +505,17 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                 this.limitBy(cLimit);
             }
         }
+    }
+
+    private static void logQuery(String query) {
+        if (SQL.dbQueryLogging) {
+            System.out.println(query);
+        }
+
+    }
+
+    private static void logQuery(StringBuilder query) {
+        logQuery(query.toString());
     }
 
 
@@ -501,29 +571,31 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of maps with column values,
          *         or empty if an error occurs
          */
-        public Optional<List<Map<E, Object>>> execute() {
+        public Optional<List<Map<E, Object>>> execute() throws Exception {
             QuerySet querySet =buildQueryBase(String.join(",", returnColumns.stream().map(E::name).toArray(String[]::new)));
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    List<Map<E, Object>> results = new ArrayList<>();
-                    while (rs.next()) {
-                        Map<E, Object> row = new HashMap<>();
-                        for (E column : returnColumns) {
-                            row.put(column, InterDefinitions.getTypedValue(rs, column));
-                        }
-                        results.add(row);
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
                     }
-                    return Optional.ofNullable(results.isEmpty() ? null : results);
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        List<Map<E, Object>> results = new ArrayList<>();
+                        while (rs.next()) {
+                            Map<E, Object> row = new HashMap<>();
+                            for (E column : returnColumns) {
+                                row.put(column, InterDefinitions.getTypedValue(rs, column));
+                            }
+                            results.add(row);
+                        }
+                        return Optional.ofNullable(results.isEmpty() ? null : results);
+                    }
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return Optional.empty();
                 }
-            } catch (Exception e) {
-                throwDBError(e);
-                return Optional.empty();
-            }
+            });
         }
 
         /**
@@ -533,7 +605,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a map with the first row's column values,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Map<E, Object>> executeOne() {
+        public Optional<Map<E, Object>> executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -664,33 +736,35 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a HashMap mapping reference table column values
          *         to binding table column values, or empty if an error occurs
          */
-        public Optional<HashMap<HashMap<E, Object>, HashMap<I, Object>>> execute() {
+        public Optional<HashMap<HashMap<E, Object>, HashMap<I, Object>>> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    HashMap<HashMap<E, Object>, HashMap<I, Object>> result = new HashMap<>();
-                    while (rs.next()) {
-                        HashMap<E, Object> refRow = new HashMap<>();
-                        for (E column : refColumns) {
-                            refRow.put(column, InterDefinitions.getTypedValue(rs, column, refTable));
-                        }
-                        HashMap<I, Object> bindingRow = new HashMap<>();
-                        for (I column : bindingColumns) {
-                            bindingRow.put(column, InterDefinitions.getTypedValue(rs, column, bindingTable));
-                        }
-                        result.put(refRow, bindingRow);
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
                     }
-                    return Optional.ofNullable(result.isEmpty() ? null : result);
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        HashMap<HashMap<E, Object>, HashMap<I, Object>> result = new HashMap<>();
+                        while (rs.next()) {
+                            HashMap<E, Object> refRow = new HashMap<>();
+                            for (E column : refColumns) {
+                                refRow.put(column, InterDefinitions.getTypedValue(rs, column, refTable));
+                            }
+                            HashMap<I, Object> bindingRow = new HashMap<>();
+                            for (I column : bindingColumns) {
+                                bindingRow.put(column, InterDefinitions.getTypedValue(rs, column, bindingTable));
+                            }
+                            result.put(refRow, bindingRow);
+                        }
+                        return Optional.ofNullable(result.isEmpty() ? null : result);
+                    }
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return Optional.empty();
                 }
-            } catch (Exception e) {
-                throwDBError(e);
-                return Optional.empty();
-            }
+            });
         }
 
         /**
@@ -699,7 +773,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first map entry of reference table column values
          *         to binding table column values, or empty if no rows exist or an error occurs
          */
-        public Optional<Map.Entry<HashMap<E, Object>, HashMap<I, Object>>> executeOneRow() {
+        public Optional<Map.Entry<HashMap<E, Object>, HashMap<I, Object>>> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -821,25 +895,27 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a HashMap mapping reference table records to binding table records,
          *         or empty if an error occurs
          */
-        public Optional<HashMap<R, A>> execute() {
+        public Optional<HashMap<R, A>> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
-            String query = querySet.query.toString();
-            if (SQL.dbQueryLogging) LogManager.getLogger().info(query);
-            try (var prepStatement = table.getDatabase().getConnection().get().prepareStatement(query)) {
-                for (int i = 0; i < querySet.parameters.size(); i++) {
-                    querySet.parameters.poll().set(prepStatement,i+1);
-                }
-                try (ResultSet rs = prepStatement.executeQuery()) {
-                    HashMap<R, A> rows = new HashMap<>();
-                    while (rs.next()) {
-                        rows.put((R) DatabaseRecord.populateRecord(refTable, rs,true),(A)DatabaseRecord.populateRecord(this.table, rs,true));
+            String query = querySet.query.append(";").toString();
+            logQuery(query);
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+                try (var prepStatement = connection.prepareStatement(query)) {
+                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                        querySet.parameters.poll().set(prepStatement, i + 1);
                     }
-                    return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                    try (ResultSet rs = prepStatement.executeQuery()) {
+                        HashMap<R, A> rows = new HashMap<>();
+                        while (rs.next()) {
+                            rows.put((R) DatabaseRecord.populateRecord(refTable, rs, true), (A) DatabaseRecord.populateRecord(this.table, rs, true));
+                        }
+                        return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                    }
+                } catch (Exception e) {
+                    throwDBError(e);
+                    return Optional.empty();
                 }
-            } catch (Exception e) {
-                throwDBError(e);
-                return Optional.empty();
-            }
+            });
         }
 
         /**
@@ -849,7 +925,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first map entry of reference table record to binding table record,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Map.Entry<R, A>> executeOneRow() {
+        public Optional<Map.Entry<R, A>> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -905,7 +981,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             }
         }
 
-        private StringBuilder appendCondition(StringBuilder currentQuery,Condition condition,ConditionType conditionType,Queue<Query.ParameterSet> parameters) {
+        private StringBuilder appendCondition(StringBuilder currentQuery,Condition<E> condition,ConditionType conditionType,Queue<Query.ParameterSet> parameters) {
             StringBuilder conditionQuery = new StringBuilder();
             conditionQuery.append(condition.column.name());
             conditionQuery.append(condition.operator.sql());
@@ -917,12 +993,12 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                         first = false;
                     } else conditionQuery.append(",");
                     conditionQuery.append("?"); // VALUE
-                    parameters.add(new Query.ParameterSet(SQL.forClass(o.getClass()).getParameterSetter(),o));
+                    parameters.add(new Query.ParameterSet(condition.column.getType().getSetData(),o));
                 }
                 conditionQuery.append(")");
             } else {
                 conditionQuery.append("?"); // VALUE
-                parameters.add(new Query.ParameterSet(SQL.forClass(condition.value.getClass()).getParameterSetter(),condition.value));
+                parameters.add(new Query.ParameterSet(condition.column.getType().getSetData(),condition.value));
             }
 
 
@@ -983,10 +1059,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          */
         public Binding(E ref, I joinref) {
             if (ref.getType() != joinref.getType()) {
-                if (SQL.dbQueryLogging) LogManager.getLogger().info("Type mismatch for Binding between "+ref.name()+":"+ref.getType()+ " " +joinref.name()+":"+joinref.getType());
-                this.ref = null;
-                this.joinref = null;
-                return;
+                throw new RuntimeException("Type mismatch for Binding between "+ref.name()+":"+ref.getType()+ " " +joinref.name()+":"+joinref.getType());
             }
             this.ref = ref;
             this.joinref = joinref;

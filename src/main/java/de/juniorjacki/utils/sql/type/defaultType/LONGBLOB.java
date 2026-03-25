@@ -11,7 +11,6 @@ import java.util.List;
 public class LONGBLOB extends DatabaseType {
     public LONGBLOB() {
         super(byte[].class,
-                List.of(),
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
                 (extendedLength) -> "LONGBLOB");

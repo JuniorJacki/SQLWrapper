@@ -11,7 +11,6 @@ import java.util.List;
 public class BLOB extends DatabaseType {
     public BLOB() {
         super(byte[].class,
-                List.of(),
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
                 (extendedLength) -> "BLOB");

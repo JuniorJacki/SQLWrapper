@@ -1,8 +1,5 @@
 package de.juniorjacki.utils.sql.routine;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
@@ -10,8 +7,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class RoutineRunner {
-
-    private Logger logger = LogManager.getLogger("SQLRoutines");
 
     private final ConcurrentHashMap<Routine, ScheduledFuture<?>> routines = new ConcurrentHashMap<>();
     private volatile ScheduledExecutorService executor;
@@ -36,9 +31,9 @@ public class RoutineRunner {
         ScheduledFuture<?> future = routines.remove(routine);
         if (future != null) {
             future.cancel(false);
-            logger.debug("Cancelled and unregistered routine: {}", routine);
+            System.out.println("Cancelled and unregistered routine: " + routine);
         } else {
-            logger.debug("Unregistered (was not scheduled yet): {}", routine);
+            System.out.println("Unregistered (was not scheduled yet): "+ routine);
         }
     }
 
@@ -48,9 +43,9 @@ public class RoutineRunner {
     public void startRoutineExecution() {
         if (isRunning.compareAndSet(false, true)) {
             executor = createFreshExecutor();
-            logger.info("Starting SQL Routines execution.");
+            System.out.println("Starting SQL Routines execution.");
         } else {
-            logger.info("Restarting SQL Routines execution.");
+            System.out.println("Restarting SQL Routines execution.");
             stopRoutineExecution();
             executor = createFreshExecutor();
         }
@@ -91,7 +86,7 @@ public class RoutineRunner {
         try {
             if (!old.awaitTermination(5, TimeUnit.SECONDS)) {
                 old.shutdownNow();
-                logger.warn("Executor did not terminate gracefully");
+                System.out.println("Executor did not terminate gracefully");
             }
         } catch (InterruptedException e) {
             old.shutdownNow();
@@ -105,11 +100,7 @@ public class RoutineRunner {
     }
 
     private void routineError(Routine routine, Exception e) {
-        logger.error("Error in routine {}: {}", routine, e.getMessage(), e);
-    }
-
-    public boolean isRunning() {
-        return isRunning.get() && executor != null && !executor.isShutdown();
+        System.out.println("Error in routine " + routine + " " + e.getMessage() + " " + e);
     }
 
     public int getRegisteredCount() {

@@ -4,9 +4,6 @@ import de.juniorjacki.utils.sql.Connector;
 import de.juniorjacki.utils.sql.Database;
 import de.juniorjacki.utils.sql.type.DatabaseProperty;
 import de.juniorjacki.utils.sql.type.DatabaseRecord;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,7 +13,6 @@ import java.util.List;
 import static de.juniorjacki.utils.sql.structure.InterDefinitions.getSQLType;
 
 public interface DatabankHandler {
-    static final Logger logger = LogManager.getLogger(DatabankHandler.class);
 
     /**
      * Creates Tables for Database

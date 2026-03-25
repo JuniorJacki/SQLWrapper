@@ -8,7 +8,6 @@ import java.util.List;
 public class LONG extends DatabaseType {
     public LONG() {
         super(Long.class,
-                List.of(long.class),
                 ResultSet::getLong,
                 (ps, idx, val) -> ps.setLong(idx, (Long) val),
                 (extendedLength) -> "BIGINT");

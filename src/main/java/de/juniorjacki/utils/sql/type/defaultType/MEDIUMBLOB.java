@@ -11,7 +11,6 @@ import java.util.List;
 public class MEDIUMBLOB extends DatabaseType {
     public MEDIUMBLOB() {
         super(byte[].class,
-                List.of(),
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
                 (extendedLength) -> "MEDIUMBLOB");

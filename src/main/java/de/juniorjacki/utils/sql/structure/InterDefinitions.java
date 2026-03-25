@@ -2,15 +2,16 @@ package de.juniorjacki.utils.sql.structure;
 
 
 
-import de.juniorjacki.utils.SQL;
 import de.juniorjacki.utils.sql.type.DatabaseProperty;
+import de.juniorjacki.utils.sql.type.DatabaseRecord;
 import de.juniorjacki.utils.sql.type.DatabaseType;
 
+import java.lang.reflect.Field;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.HexFormat;
+import java.util.List;
 
 public class InterDefinitions {
 
@@ -36,7 +37,16 @@ public class InterDefinitions {
         if (table != null) {
             columnName = table.tableName() + "." + columnName;
         }
-        return returnColumn.getType().getResultSetConverter().apply(rs, columnName);
+        return returnColumn.getType().getExtractData().apply(rs, columnName);
+    }
+
+
+    public static  <R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> void setParameters(PreparedStatement prepStatement, R record, List<E> properties) throws SQLException, NoSuchFieldException, IllegalAccessException {
+        for (int index = 0; index < properties.size(); index++) {
+            Field dataField = record.getClass().getDeclaredField(properties.get(index).name());
+            dataField.setAccessible(true);
+            setParameter(prepStatement, index + 1, properties.get(index),dataField.get(record));
+        }
     }
 
     /**
@@ -44,12 +54,17 @@ public class InterDefinitions {
      *
      * @param prepStatement The PreparedStatement to set the parameter on
      * @param index        The parameter index
-     * @param value        The value to set
+     * @param value       The value to set
+     * @param valueType        The value type of the value
      * @throws SQLException if a database error occurs
      */
-    public static void setParameter(PreparedStatement prepStatement, int index, Object value) throws SQLException {
+    public static <E extends Enum<E> & DatabaseProperty> void setParameter(PreparedStatement prepStatement, int index, E valueType,Object value) throws SQLException {
         try {
-            SQL.forClass(value.getClass()).getParameterSetter().accept(prepStatement, index, value);
+            if (valueType == null) {
+                prepStatement.setNull(index, Types.VARCHAR);
+                return;
+            }
+            valueType.getType().getSetData().accept(prepStatement, index, value);
         } catch (Exception e) {
             throwDBError(e);
         }
@@ -70,7 +85,7 @@ public class InterDefinitions {
         if (property == null) {
             throw new IllegalArgumentException("Property cannot be null");
         }
-        constructorArgs[index] = property.getType().getResultSetConverter().apply(resultSet, componentName);
+        constructorArgs[index] = property.getType().getExtractData().apply(resultSet, componentName);
     }
 
     /**

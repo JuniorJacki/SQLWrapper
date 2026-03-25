@@ -8,7 +8,6 @@ import java.util.List;
 public class INTEGER extends DatabaseType {
     public INTEGER() {
         super(Integer.class,
-                List.of(int.class),
                 ResultSet::getInt,
                 (ps, idx, val) -> ps.setInt(idx, (Integer) val),
                 (extendedLength) -> "INT");

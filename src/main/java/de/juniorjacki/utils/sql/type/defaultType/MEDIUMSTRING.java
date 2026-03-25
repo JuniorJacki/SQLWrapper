@@ -7,7 +7,7 @@ import java.util.List;
 
 public class MEDIUMSTRING extends DatabaseType {
     public MEDIUMSTRING() {
-        super(String.class, List.of(CharSequence.class),
+        super(String.class,
                 ResultSet::getString,
                 (ps, idx, val) -> ps.setString(idx, (String) val),
                 (extendedLength) -> "MEDIUMTEXT");

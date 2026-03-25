@@ -11,7 +11,6 @@ import java.util.List;
 public class DOUBLE extends DatabaseType {
     public DOUBLE() {
         super(Double.class,
-                List.of(double.class),
                 ResultSet::getDouble,
                 (ps, idx, val) -> ps.setDouble(idx, (Double) val),
                 (extendedLength) -> "DOUBLE");

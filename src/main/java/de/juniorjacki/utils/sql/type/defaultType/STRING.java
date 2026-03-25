@@ -10,7 +10,7 @@ import java.util.function.Function;
 
 public class STRING extends DatabaseType {
     public STRING() {
-        super(String.class, List.of(CharSequence.class),
+        super(String.class,
                 ResultSet::getString,
                 (ps, idx, val) -> ps.setString(idx, (String) val),
                 (extendedLength) -> extendedLength == 0 ? "VARCHAR(255)" : "VARCHAR(" + extendedLength + ")");

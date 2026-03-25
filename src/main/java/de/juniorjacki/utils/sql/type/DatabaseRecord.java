@@ -105,31 +105,8 @@ public interface DatabaseRecord<T, F extends Enum<F> & DatabaseProperty> {
         return constructor.newInstance(constructorArgs);
     }
 
-
-
     public static <T extends Table<T,E, ?>, E extends Enum<E> & DatabaseProperty> Object populateRecord(T table, ResultSet resultSet) throws Exception {
         return populateRecord(table, resultSet, false);
     }
-
-
-
-
-    public static <T> T populateRecord(Class<T> recordClass, Map<String, Object> fieldMap) throws Exception {
-        Constructor<?> constructor = recordClass.getDeclaredConstructors()[0];
-        Object[] constructorArgs = new Object[constructor.getParameterCount()];
-        RecordComponent[] components = recordClass.getRecordComponents();
-        for (int i = 0; i < components.length; i++) {
-            RecordComponent component = components[i];
-            constructorArgs[i] = fieldMap.get(component.getName());
-        }
-        return (T) constructor.newInstance(constructorArgs);
-    }
-
-    public static Object getValueByName(Object record, String fieldName) throws NoSuchFieldException, IllegalAccessException {
-        Field field = record.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        return field.get(record);
-    }
-
 
 }

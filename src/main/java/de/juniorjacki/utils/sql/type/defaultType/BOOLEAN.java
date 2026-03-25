@@ -11,7 +11,6 @@ import java.util.List;
 public class BOOLEAN extends DatabaseType {
     public BOOLEAN() {
         super(Boolean.class,
-                List.of(boolean.class),
                 ResultSet::getBoolean,
                 (ps, idx, val) -> ps.setBoolean(idx, (Boolean) val),
                 (extendedLength) -> "BOOLEAN");

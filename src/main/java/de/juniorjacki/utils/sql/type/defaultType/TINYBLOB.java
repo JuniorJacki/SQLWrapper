@@ -11,7 +11,6 @@ import java.util.List;
 public class TINYBLOB extends DatabaseType {
     public TINYBLOB() {
         super(byte[].class,
-                List.of(),
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
                 (extendedLength) -> "TINYBLOB");

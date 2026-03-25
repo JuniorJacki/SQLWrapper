@@ -3,47 +3,39 @@ package de.juniorjacki.utils.sql.type;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.function.Function;
 
 public abstract class DatabaseType {
-    private final Class<?> type;
-    private final List<Class<?>> aliasTypes;
-    private final TriFunction<ResultSet, String, Object> resultSetConverter;
-    private final TriConsumer<PreparedStatement, Integer, Object> parameterSetter;
+    private final Class<?> javaTypeClass;
+    private final TriFunction<ResultSet, String, Object> extractData;
+    private final TriConsumer<PreparedStatement, Integer, Object> setData;
     private final Function<Integer, String> sqlTypeMapper;
 
-    public DatabaseType(Class<?> type,
-                        List<Class<?>> aliasTypes,
-                        TriFunction<ResultSet, String, Object> resultSetConverter,
+    public DatabaseType(Class<?> javaTypeClass,
+                        TriFunction<ResultSet, String, Object> extractData,
                         TriConsumer<PreparedStatement, Integer, Object> parameterSetter,
                         Function<Integer, String> sqlTypeMapper) {
-        this.type = type;
-        this.aliasTypes = aliasTypes;
-        this.resultSetConverter = resultSetConverter;
-        this.parameterSetter = parameterSetter;
+        this.javaTypeClass = javaTypeClass;
+        this.extractData = extractData;
+        this.setData = parameterSetter;
         this.sqlTypeMapper = sqlTypeMapper;
     }
 
 
     public Class<?> getTypeClass() {
-        return type;
+        return javaTypeClass;
     }
 
-    public List<Class<?>> getAliasTypes() {
-        return aliasTypes;
-    }
-
-    public TriConsumer<PreparedStatement, Integer, Object> getParameterSetter() {
-        return parameterSetter;
+    public TriConsumer<PreparedStatement, Integer, Object> getSetData() {
+        return setData;
     }
 
     public Function<Integer, String> getSqlTypeMapper() {
         return sqlTypeMapper;
     }
 
-    public TriFunction<ResultSet, String, Object> getResultSetConverter() {
-        return resultSetConverter;
+    public TriFunction<ResultSet, String, Object> getExtractData() {
+        return extractData;
     }
 
     /**
