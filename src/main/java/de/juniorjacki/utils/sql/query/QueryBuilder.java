@@ -36,6 +36,12 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
     }
 
 
+    /**
+     * Inserts a new row into the table or updates it if a duplicate key is found.
+     *
+     * @param rowData the record containing the data to insert or update
+     * @return true if a row was inserted or updated, false otherwise
+     */
     default boolean insert(R rowData) {
         try {
             List<E> properties = getInstance().getProperties();

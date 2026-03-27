@@ -15,6 +15,14 @@ public abstract class Connector {
         MySQL
     }
 
+    /**
+     * @param type Database Type
+     * @param host IP or Domain of SQL Server
+     * @param port Port of SQL Server
+     * @param dataBase Specific Database on Server
+     * @param username Username to Authenticate
+     * @param passwd Password to Authenticate
+     */
     public record DatabaseKey(DatabaseType type, String host, int port, String dataBase, String username, String passwd) {
     };
 
@@ -30,24 +38,14 @@ public abstract class Connector {
         private HandledConnection inUseHandledConnection;
         private long lastUseTimestamp;
 
-        private Runnable poolHealthKeeper;
 
         StoredConnection(Connection connection,Connector dbConnector) {
-            System.out.println("New Connection");
             this.connection = connection;
             this.dbConnector = dbConnector;
             initTimestamp = System.currentTimeMillis();
             lastUseTimestamp = initTimestamp;
-            poolHealthKeeper = () -> {
-                if (dbConnector.activeHandledConnections.contains(this)) {
-                   if (autoDelete()) {
-                       return;
-                   }
-                }
-                Connector.conPoolHealthService.schedule(poolHealthKeeper,60000, TimeUnit.MILLISECONDS);
-            };
-            Connector.conPoolHealthService.schedule(poolHealthKeeper,minimumExistenceTime+10000, TimeUnit.MILLISECONDS);
             dbConnector.activeHandledConnections.add(this);
+            Connector.conPoolHealthService.schedule(this::runHealthCheck,minimumExistenceTime+10000, TimeUnit.MILLISECONDS);
         }
 
         HandledConnection use() {
@@ -68,6 +66,14 @@ public abstract class Connector {
             if (this.inUseHandledConnection == inUseHandledConnection) {
                 this.inUseHandledConnection = null;
                 dbConnector.availableOpenConnections.add(this);
+            }
+        }
+
+        private void runHealthCheck() {
+            if (dbConnector.activeHandledConnections.contains(this)) {
+                if (!autoDelete()) {
+                    Connector.conPoolHealthService.schedule(this::runHealthCheck,60000, TimeUnit.MILLISECONDS);
+                }
             }
         }
 
@@ -155,6 +161,16 @@ public abstract class Connector {
             this.storedConnection = connHandle;
         }
 
+        /**
+         Executes a query that returns a result using the wrapped connection.
+         The connection is automatically returned to the pool after execution,
+         even if an exception occurs.
+
+         @param query the functional interface containing the query logic
+         @param <T> the type of the result returned by the query
+         @return the result of the query execution
+         @throws Exception any exception thrown during query execution
+         */
         public <T> T handleAndCloseWithResult(ExecuteQueryWithResult<T> query) throws Exception {
             try {
                 return query.execute(storedConnection.getConnection(this));
@@ -163,6 +179,14 @@ public abstract class Connector {
             }
         }
 
+        /**
+         Executes a query using the wrapped connection.
+         The connection is automatically returned to the pool after execution,
+         even if an exception occurs.
+
+         @param query the functional interface containing the query logic
+         @throws Exception any exception thrown during query execution
+         */
         public void handleAndClose(ExecuteQuery query) throws Exception {
             try {
                 query.execute(storedConnection.getConnection(this));

@@ -15,12 +15,21 @@ import java.util.List;
 
 public class InterDefinitions {
 
+    /**
+     * Retrieves a typed value from a ResultSet
+     *
+     * @param rs           The ResultSet containing the query results
+     * @param returnColumn The column to retrieve
+     * @return The typed value of the column
+     * @throws IllegalArgumentException if returnColumn is null
+     * @throws SQLException if a database error occurs
+     */
     public static Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn) throws SQLException {
         return InterDefinitions.getTypedValue(rs,returnColumn,null);
     }
 
     /**
-     * Retrieves a typed value from a ResultSet for the specified column and table.
+     * Retrieves a typed value from a ResultSet for the specified column and table (used for join queries).
      *
      * @param rs           The ResultSet containing the query results
      * @param returnColumn The column to retrieve
@@ -29,7 +38,7 @@ public class InterDefinitions {
      * @throws IllegalArgumentException if returnColumn is null
      * @throws SQLException if a database error occurs
      */
-    public static  Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn, Table<?,?, ?> table) throws SQLException {
+    public static Object getTypedValue(ResultSet rs, DatabaseProperty returnColumn, Table<?,?, ?> table) throws SQLException {
         if (returnColumn == null) {
             throw new IllegalArgumentException("Return column cannot be null");
         }
@@ -40,7 +49,12 @@ public class InterDefinitions {
         return returnColumn.getType().getExtractData().apply(rs, columnName);
     }
 
-
+    /**
+     * Sets all parameter values for a PreparedStatement according to the record
+     *
+     * @param prepStatement The PreparedStatement to set the parameter on
+     * @throws SQLException if a database error occurs
+     */
     public static  <R extends java.lang.Record & DatabaseRecord<R, E>, E extends Enum<E> & DatabaseProperty> void setParameters(PreparedStatement prepStatement, R record, List<E> properties) throws SQLException, NoSuchFieldException, IllegalAccessException {
         for (int index = 0; index < properties.size(); index++) {
             Field dataField = record.getClass().getDeclaredField(properties.get(index).name());
