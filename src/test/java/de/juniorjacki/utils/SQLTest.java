@@ -10,13 +10,12 @@ import java.sql.SQLException;
 
 class SQLTest {
 
-
     public static void main(String[] args) throws SQLException, ClassNotFoundException {
         new SQLTest().newDatabase();
     }
 
     void newDatabase() {
-        Database db = SQL.newDatabase("Ente",new Connector.dbKey(Connector.DatabaseType.MySQL,"localhost",3306,"jsql",System.getenv("dbUser"),System.getenv("dbPasswd")),e -> System.out.println("Con Error " + e));
+        Database db = SQL.newDatabase("Ente",new Connector.DatabaseKey(Connector.DatabaseType.MySQL,"localhost",3306,"jsql",System.getenv("dbUser"),System.getenv("dbPasswd")),10, e -> System.out.println("Con Error " + e));
         try {
             db.registerTable(TestTable.class);
             db.registerTable(TestTable2.class);

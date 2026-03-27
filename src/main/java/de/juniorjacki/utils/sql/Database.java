@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,8 +26,8 @@ public class Database extends Connector implements DatabankHandler {
     public boolean isActive() {return isInitiated;}
     private boolean isInitiated = false;
 
-    public Database(String databaseName, Connector.dbKey databaseKey, ConErrorHandler connectionErrorHandler) {
-        super(databaseKey);
+    public Database(String databaseName, DatabaseKey databaseKey,int connectionPoolSize, ConErrorHandler connectionErrorHandler) {
+        super(databaseKey,connectionPoolSize);
         this.dbName = databaseName;
         this.connectionErrorHandler = connectionErrorHandler;
     }
@@ -53,6 +52,7 @@ public class Database extends Connector implements DatabankHandler {
 
     public void initiate() throws Exception {
         if (isActive()) return;
+        if (!testKey()) throw new RuntimeException("Database connection failed");
         HandledConnection handleCon = getNewHandledConnection();
         try {
             handleCon.handleAndCloseWithResult(connection -> {
@@ -77,6 +77,9 @@ public class Database extends Connector implements DatabankHandler {
         return getNewConnection();
     }
 
+    /**
+     * @return New Handled Connection (Connection from Pool, Auto Closed or reused after use). May Throw Exception if service is not started or Database is not reachable
+     */
     public HandledConnection getHandledConnection() throws SQLException {
         if (!isInitiated) throw new IllegalStateException("Database is not initiated");
         return getNewHandledConnection();
@@ -86,6 +89,7 @@ public class Database extends Connector implements DatabankHandler {
     public void exit() {
         if (isInitiated) {
             routineRunner.stopRoutineExecution();
+            closeAllHandledConnections();
             isInitiated = false;
         }
     }
