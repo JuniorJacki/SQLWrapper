@@ -44,6 +44,7 @@ public class Database extends Connector implements DatabankHandler {
      @throws Exception if an error occurs while building the table
      */
     public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> void registerTable(Class<T> tableClass) throws Exception {
+        if (activeTables.containsKey(tableClass) || waitingTables.get().contains(tableClass)) throw new IllegalArgumentException("Table is already registered");
         if (isInitiated) {
             getNewHandledConnection().handleAndClose(connection -> activeTables.put((Class<Table<?,?, ?>>) tableClass,buildDatabaseTable(this,connection, (Class<Table<?,?, ?>>) tableClass)));
         } else waitingTables.get().add((Class<Table<?,?, ?>>) tableClass);

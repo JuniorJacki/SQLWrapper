@@ -1,6 +1,5 @@
 package de.juniorjacki.utils.sql.structure;
 
-import de.juniorjacki.utils.sql.Connector;
 import de.juniorjacki.utils.sql.Database;
 import de.juniorjacki.utils.sql.type.DatabaseProperty;
 import de.juniorjacki.utils.sql.type.DatabaseRecord;
@@ -20,10 +19,10 @@ public interface DatabankHandler {
      * @return
      */
     default <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?,?> buildDatabaseTable(Database database, Connection con, Class<Table<?,?, ?>> tableClass) throws Exception {
-        Table<?,?,?> table = tableClass.getDeclaredConstructor().newInstance();
+        Table<T, E, R> table = (Table<T, E, R>) tableClass.getDeclaredConstructor().newInstance();
         table.setDatabase(database);
         con.createStatement().execute(generateCreateTableQuery(table.tableName(),table.tableProperties()));
-        if (isTableEmpty(con, table.tableName())) table.onCreation();
+        if (isTableEmpty(con, table.tableName())) table.onCreation((Table<T, E, R>) table);
         return table;
     }
 
