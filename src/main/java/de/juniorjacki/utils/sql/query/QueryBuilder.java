@@ -110,6 +110,24 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         }
 
         /**
+         * Sets the condition for the data requested from the database.
+         * This allows filtering the results based on specified conditions.
+         *
+         * @param conditionQuery The condition
+         * @return The current query instance for method chaining
+         * @throws IllegalArgumentException if the conditionQuery is null
+         */
+        @SuppressWarnings("unchecked")
+        public T setSingleCondition(Condition<E> conditionQuery) {
+            if (conditionQuery == null) {
+                throw new IllegalArgumentException("Condition cannot be null");
+            }
+            this.conditionQuery = new ConditionQueryBuilder<>(conditionQuery);
+            return (T) this;
+        }
+
+
+        /**
          * Limits the number of rows returned by the query.
          *
          * @param limit The maximum number of rows to return
@@ -472,7 +490,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of values for the selected column,
          *         or empty if an error occurs
          */
-        public Optional<List<Object>> execute() throws Exception {
+        public Optional<List<?>> execute() throws Exception {
             QuerySet querySet =buildQueryBase(scopeColumn.name());
             String query = querySet.query.append(";").toString();
             logQuery(query);
@@ -502,7 +520,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first value of the selected column,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Object> executeOne() throws Exception {
+        public Optional<?> executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -577,11 +595,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of maps with column values,
          *         or empty if an error occurs
          */
-        public Optional<List<Map<E, Object>>> execute() throws Exception {
+        public Optional<List<Map<E, ?>>> execute() throws Exception {
             QuerySet querySet =buildQueryBase(String.join(",", returnColumns.stream().map(E::name).toArray(String[]::new)));
             String query = querySet.query.append(";").toString();
             logQuery(query);
-            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+            return (Optional<List<Map<E, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
                     for (int i = 0; i < querySet.parameters.size(); i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
@@ -611,7 +629,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a map with the first row's column values,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Map<E, Object>> executeOne() throws Exception {
+        public Optional<Map<E, ?>> executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
@@ -742,11 +760,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a HashMap mapping reference table column values
          *         to binding table column values, or empty if an error occurs
          */
-        public Optional<HashMap<HashMap<E, Object>, HashMap<I, Object>>> execute() throws Exception {
+        public Optional<HashMap<HashMap<E, ?>, HashMap<I, ?>>> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
             String query = querySet.query.append(";").toString();
             logQuery(query);
-            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+            return (Optional<HashMap<HashMap<E, ?>, HashMap<I, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
                     for (int i = 0; i < querySet.parameters.size(); i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
@@ -779,7 +797,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first map entry of reference table column values
          *         to binding table column values, or empty if no rows exist or an error occurs
          */
-        public Optional<Map.Entry<HashMap<E, Object>, HashMap<I, Object>>> executeOneRow() throws Exception {
+        public Optional<Map.Entry<HashMap<E, ?>, HashMap<I, ?>>> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);

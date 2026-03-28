@@ -20,7 +20,7 @@ class SQLTest {
             db.registerTable(TestTable.class);
             db.registerTable(TestTable2.class);
             db.initiate();
-            TestTable table = (TestTable) db.getTable(TestTable.class);
+            TestTable table = db.getTable(TestTable.class);
             TestTable2 table2 = (TestTable2) db.getTable(TestTable2.class);
             table.newRowQuery().setCondition(new QueryBuilder.ConditionQueryBuilder<>(new QueryBuilder.Condition<>(TestTable.Property.preName, InterDefinitions.Operator.EQUALS,"ente"))).execute().ifPresent(System.out::println);
 

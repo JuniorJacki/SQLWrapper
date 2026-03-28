@@ -59,8 +59,8 @@ public class Database extends Connector implements DatabankHandler {
      @param tableClass the class of the table to retrieve
      @return the active Table instance, or null if the table has not been registered
      */
-    public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> Table<?,?,?> getTable(Class<T> tableClass) {
-        return (Table<T,E, R>) activeTables.get(tableClass);
+    public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> T getTable(Class<T> tableClass) {
+        return (T) activeTables.get(tableClass);
     }
 
     /**
