@@ -6,29 +6,29 @@ import de.juniorjacki.utils.sql.type.DatabaseProperty;
 import de.juniorjacki.utils.sql.type.DatabaseRecord;
 import de.juniorjacki.utils.sql.type.DatabaseType;
 import de.juniorjacki.utils.sql.type.defaultType.INTEGER;
-import de.juniorjacki.utils.sql.type.defaultType.STRING;
+import de.juniorjacki.utils.sql.type.defaultType.UUID;
 
 import java.util.Arrays;
 import java.util.List;
 
-public class TestTable2 extends Table<TestTable2, TestTable2.Property, TestTable2.Test2> implements QueryBuilder<TestTable2, TestTable2.Property, TestTable2.Test2> {
+public class TestTable3 extends Table<TestTable3, TestTable3.Property, TestTable3.Test3> implements QueryBuilder<TestTable3, TestTable3.Property, TestTable3.Test3> {
 
     @Override
-    public Class<Test2> getTableRecord() {
-        return Test2.class;
+    public Class<Test3> getTableRecord() {
+        return Test3.class;
     }
 
-    public record Test2(String preName, Integer age) implements DatabaseRecord<Test2, Property> {
+    public record Test3(java.util.UUID uuid, Integer age) implements DatabaseRecord<Test3, Property> {
 
     }
     @Override
     public List<Property> getProperties() {
-        return Arrays.asList(TestTable2.Property.values());
+        return Arrays.asList(TestTable3.Property.values());
     }
 
     public enum Property implements DatabaseProperty {
-        preName(true, STRING.INSTANCE),
-        age(false,INTEGER.INSTANCE),
+        uuid(false, UUID.INSTANCE),
+        age(true,INTEGER.INSTANCE),
         ;
 
         private final boolean key;

@@ -22,6 +22,7 @@ public class UUID extends DatabaseType {
     public final static UUID INSTANCE = new UUID();
 
     public static byte[] convertUUIDToBytes(java.util.UUID uuid) {
+        if (uuid == null) return null;
         ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
         bb.putLong(uuid.getMostSignificantBits());
         bb.putLong(uuid.getLeastSignificantBits());
