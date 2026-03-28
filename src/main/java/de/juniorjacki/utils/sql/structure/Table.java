@@ -55,7 +55,7 @@ public abstract class Table<T extends Table<T,E, R>,E extends Enum<E> & Database
      * such as inserting default data, creating indexes, or setting up triggers.
      * @throws Exception if an error occurs during post-creation logic
      */
-    public void onCreation(Table<T,E,R> table) throws Exception {}
+    public void onCreation(T table) throws Exception {}
 
     public List<Property> tableProperties() {
         List<Property> properties = new ArrayList<>();

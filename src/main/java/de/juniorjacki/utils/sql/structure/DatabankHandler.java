@@ -22,7 +22,7 @@ public interface DatabankHandler {
         Table<T, E, R> table = (Table<T, E, R>) tableClass.getDeclaredConstructor().newInstance();
         table.setDatabase(database);
         con.createStatement().execute(generateCreateTableQuery(table.tableName(),table.tableProperties()));
-        if (isTableEmpty(con, table.tableName())) table.onCreation((Table<T, E, R>) table);
+        if (isTableEmpty(con, table.tableName())) table.onCreation((T) table);
         return table;
     }
 
