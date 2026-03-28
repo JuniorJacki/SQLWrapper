@@ -31,9 +31,6 @@ public class RoutineRunner {
         ScheduledFuture<?> future = routines.remove(routine);
         if (future != null) {
             future.cancel(false);
-            System.out.println("Cancelled and unregistered routine: " + routine);
-        } else {
-            System.out.println("Unregistered (was not scheduled yet): "+ routine);
         }
     }
 
@@ -43,9 +40,7 @@ public class RoutineRunner {
     public void startRoutineExecution() {
         if (isRunning.compareAndSet(false, true)) {
             executor = createFreshExecutor();
-            System.out.println("Starting SQL Routines execution.");
         } else {
-            System.out.println("Restarting SQL Routines execution.");
             stopRoutineExecution();
             executor = createFreshExecutor();
         }
@@ -86,7 +81,6 @@ public class RoutineRunner {
         try {
             if (!old.awaitTermination(5, TimeUnit.SECONDS)) {
                 old.shutdownNow();
-                System.out.println("Executor did not terminate gracefully");
             }
         } catch (InterruptedException e) {
             old.shutdownNow();

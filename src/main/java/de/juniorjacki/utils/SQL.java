@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SQL {
 
-    public static boolean dbQueryLogging = true;
+    public static boolean dbQueryLogging = false;
 
     static ConcurrentHashMap<String,Database> databaseMap = new ConcurrentHashMap<>();
 
