@@ -247,8 +247,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                 logQuery(query);
                 return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                     try (var prepStatement = connection.prepareStatement(query)) {
-                        for (int i = 0; i < querySet.parameters.size(); i++) {
-                           querySet.parameters.poll().set(prepStatement,i+1);
+                        int a = querySet.parameters.size();
+                        for (int i = 0; i < a; i++) {
+                            querySet.parameters.poll().set(prepStatement,i+1);
                         }
                         try (ResultSet rs = prepStatement.executeQuery()) {
                             return rs.next();
@@ -274,7 +275,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement,i+1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
@@ -331,7 +333,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
@@ -473,7 +476,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query.toString())) {
                     scopeColumn.getType().getSetData().accept(prepStatement, 1, newValue);
-                    for (int i = 1; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 1; i <= a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     return prepStatement.executeUpdate();
@@ -496,7 +500,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
@@ -601,7 +606,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return (Optional<List<Map<E, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
@@ -766,7 +772,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return (Optional<HashMap<HashMap<E, ?>, HashMap<I, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
@@ -925,7 +932,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {

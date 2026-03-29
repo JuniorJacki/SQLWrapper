@@ -4,6 +4,7 @@ import de.juniorjacki.utils.sql.type.DatabaseType;
 
 import java.nio.ByteBuffer;
 import java.sql.ResultSet;
+import java.util.Arrays;
 import java.util.List;
 
 public class UUID extends DatabaseType {

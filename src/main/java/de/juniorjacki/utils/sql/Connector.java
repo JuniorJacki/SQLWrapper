@@ -141,15 +141,17 @@ public abstract class Connector {
     }
 
     protected Connection getNewConnection() throws SQLException {
+        Connection connection;
         try {
-            return DriverManager.getConnection("jdbc:mysql://" + dbKey.host + ":" + dbKey.port + "/" + dbKey.dataBase, dbKey.username, dbKey.passwd);
+            connection = DriverManager.getConnection("jdbc:mysql://" + dbKey.host + ":" + dbKey.port + "/" + dbKey.dataBase, dbKey.username, dbKey.passwd);
         } catch (SQLSyntaxErrorException e) {
             DriverManager.getConnection("jdbc:mysql://" + dbKey.host + ":" + dbKey.port, dbKey.username, dbKey.passwd).createStatement().execute("CREATE DATABASE IF NOT EXISTS " + dbKey.dataBase);
-            return DriverManager.getConnection("jdbc:mysql://" + dbKey.host + ":" + dbKey.port + "/" + dbKey.dataBase, dbKey.username, dbKey.passwd);
+            connection = DriverManager.getConnection("jdbc:mysql://" + dbKey.host + ":" + dbKey.port + "/" + dbKey.dataBase, dbKey.username, dbKey.passwd);
         } catch (Exception e) {
             new Thread(() -> conError(e)).start();
             throw e;
         }
+        return connection;
     }
 
     abstract void conError(Exception e);
