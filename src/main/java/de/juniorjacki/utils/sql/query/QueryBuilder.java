@@ -363,7 +363,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             logQuery(query);
             return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query.toString())) {
-                    for (int i = 0; i < querySet.parameters.size(); i++) {
+                    int a = querySet.parameters.size();
+                    for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     return prepStatement.executeUpdate();
