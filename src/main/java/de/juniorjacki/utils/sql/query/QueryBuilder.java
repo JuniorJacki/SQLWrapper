@@ -905,7 +905,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             if (conditionQuery != null) {
                 ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build(this.table.tableName());
                 parameters.addAll(querySet.parameters);
-                query.append(querySet.query.toString());
+                query.append(" ").append(querySet.query.toString());
             }
 
             if (groupBy != null) {
