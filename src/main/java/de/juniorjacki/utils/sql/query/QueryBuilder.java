@@ -743,9 +743,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
 
             // Additional conditions
             if (conditionQuery != null) {
-                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
+                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build(this.table.tableName());
                 parameters.addAll(querySet.parameters);
-                query.append(querySet.query.toString());
+                query.append(" ").append(querySet.query.toString());
             }
             if (groupBy != null) {
                 query.append(" GROUP BY ").append(groupBy.name());
@@ -903,7 +903,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             // Additional conditions
 
             if (conditionQuery != null) {
-                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build();
+                ConditionQueryBuilder.ConditionQuerySet querySet = conditionQuery.build(this.table.tableName());
                 parameters.addAll(querySet.parameters);
                 query.append(querySet.query.toString());
             }
@@ -993,18 +993,22 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         record ConditionQuerySet(StringBuilder query,Queue<Query.ParameterSet> parameters){};
 
         protected ConditionQuerySet build() {
+            return build(null);
+        }
+
+        protected ConditionQuerySet build(String tableName) {
             if (initalCondition == null) return new ConditionQuerySet(new StringBuilder(),new LinkedList<>());
             StringBuilder query = new StringBuilder();
             Queue<Query.ParameterSet> parametersQueue = new LinkedList<>();
             if (initalCondition.typeCheck()) {
-                query = appendCondition(query,initalCondition,null,parametersQueue);
+                query = appendCondition(query,initalCondition,null,parametersQueue,tableName);
                 Map.Entry<Condition<E>,ConditionType> condition;
                 while((condition = conditions.poll()) != null) {
                     if (!condition.getKey().typeCheck()) {
                         condition.getKey().throwInputError();
                         return null;
                     }
-                    query = appendCondition(query,condition.getKey(),condition.getValue(),parametersQueue);
+                    query = appendCondition(query,condition.getKey(),condition.getValue(),parametersQueue,tableName);
                 }
                 query.insert(0, "WHERE ");
                 return new ConditionQuerySet(query,parametersQueue);
@@ -1014,8 +1018,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             }
         }
 
-        private StringBuilder appendCondition(StringBuilder currentQuery,Condition<E> condition,ConditionType conditionType,Queue<Query.ParameterSet> parameters) {
+        private StringBuilder appendCondition(StringBuilder currentQuery,Condition<E> condition,ConditionType conditionType,Queue<Query.ParameterSet> parameters,String tableName) {
             StringBuilder conditionQuery = new StringBuilder();
+            if (tableName != null) conditionQuery.append(tableName).append(".");
             conditionQuery.append(condition.column.name());
             conditionQuery.append(condition.operator.sql());
             if (condition.operator == InterDefinitions.INOperator.IN || condition.operator == InterDefinitions.INOperator.NOT_IN) {
