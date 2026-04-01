@@ -18,7 +18,7 @@ public class UUID extends DatabaseType {
                     return null;
                 },
                 (ps, idx, val) -> ps.setBytes(idx, convertUUIDToBytes((java.util.UUID) val)),
-                (extendedLength) -> "LONGTEXT");
+                (extendedLength) -> "BINARY(16)");
     }
     public final static UUID INSTANCE = new UUID();
 
