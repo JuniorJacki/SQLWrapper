@@ -13,7 +13,7 @@ public class BLOB extends DatabaseType {
         super(byte[].class,
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
-                (extendedLength) -> "BLOB("+extendedLength+")");
+                (extendedLength) -> extendedLength == 0 ? "BINARY(64)" : "BINARY(" + extendedLength + ")");
     }
 
     public final static BLOB INSTANCE = new BLOB();
