@@ -6,7 +6,7 @@
 
     <groupId>de.juniorjacki.utils</groupId>
     <artifactId>sql</artifactId>
-    <version>1.1.6</version>
+    <version>1.1.7</version>
     <name>SQLWrapper</name>
     <url>https://github.com/JuniorJacki/SQLWrapper</url>
     <description>A Java Wrapper for interacting with SQL Databases</description>
