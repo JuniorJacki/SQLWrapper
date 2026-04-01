@@ -10,7 +10,7 @@ public class MEDIUMSTRING extends DatabaseType {
         super(String.class,
                 ResultSet::getString,
                 (ps, idx, val) -> ps.setString(idx, (String) val),
-                (extendedLength) -> "MEDIUMTEXT");
+                (extendedLength) -> "MEDIUMTEXT("+extendedLength+")");
     }
     public final static MEDIUMSTRING INSTANCE = new MEDIUMSTRING();
 }

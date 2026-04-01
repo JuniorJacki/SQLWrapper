@@ -13,7 +13,7 @@ public class TINYBLOB extends DatabaseType {
         super(byte[].class,
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
-                (extendedLength) -> "TINYBLOB");
+                (extendedLength) -> "TINYBLOB("+extendedLength+")");
     }
     public final static TINYBLOB INSTANCE = new TINYBLOB();
 }

@@ -13,7 +13,7 @@ public class MEDIUMBLOB extends DatabaseType {
         super(byte[].class,
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
-                (extendedLength) -> "MEDIUMBLOB");
+                (extendedLength) -> "MEDIUMBLOB("+extendedLength+")");
     }
     public final static MEDIUMBLOB INSTANCE = new MEDIUMBLOB();
 }

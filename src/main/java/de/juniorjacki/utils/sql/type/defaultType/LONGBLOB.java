@@ -13,7 +13,7 @@ public class LONGBLOB extends DatabaseType {
         super(byte[].class,
                 ResultSet::getBytes,
                 (ps, idx, val) -> ps.setBytes(idx, (byte[]) val),
-                (extendedLength) -> "LONGBLOB");
+                (extendedLength) -> "LONGBLOB("+extendedLength+")");
     }
     public final static LONGBLOB INSTANCE = new LONGBLOB();
 }

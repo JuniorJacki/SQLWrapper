@@ -10,7 +10,7 @@ public class LONGSTRING extends DatabaseType {
         super(String.class,
                 ResultSet::getString,
                 (ps, idx, val) -> ps.setString(idx, (String) val),
-                (extendedLength) -> "LONGTEXT");
+                (extendedLength) -> "LONGTEXT("+extendedLength+")");
     }
 
     public final static LONGSTRING INSTANCE = new LONGSTRING();
