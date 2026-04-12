@@ -48,6 +48,15 @@ public abstract class Connector {
             Connector.conPoolHealthService.schedule(this::runHealthCheck,minimumExistenceTime+10000, TimeUnit.MILLISECONDS);
         }
 
+        boolean isFunctional() {
+            try {
+                return connection.isValid(1000);
+            } catch (SQLException e) {
+                close();
+                return false;
+            }
+        }
+
         HandledConnection use() {
             if (this.inUseHandledConnection == null) {
                 lastUseTimestamp = System.currentTimeMillis();
@@ -119,16 +128,25 @@ public abstract class Connector {
 
     private StoredConnection getConnectionFromPool() throws SQLException {
         StoredConnection storedConnection = availableOpenConnections.poll();
-        if (storedConnection != null) return storedConnection;
+        if (storedConnection != null) {
+            if (checkConnection(storedConnection)){
+                return storedConnection;
+            } else return getConnectionFromPool();
+        }
         if (activeHandledConnections.size() < maxHandledDBConnections) {
             return new StoredConnection(getNewConnection(),this);
         }
         long sTime =  System.currentTimeMillis();
         while (sTime + 1000 > System.currentTimeMillis()) {
             storedConnection = availableOpenConnections.poll();
-            if (storedConnection != null) return storedConnection;
+            if (checkConnection(storedConnection)) return storedConnection;
         }
         throw new SQLException("Database pool timed out");
+    }
+
+    private boolean checkConnection(StoredConnection connection) {
+        if (connection != null) return connection.isFunctional();
+        return false;
     }
 
     protected HandledConnection getNewHandledConnection() throws SQLException {
