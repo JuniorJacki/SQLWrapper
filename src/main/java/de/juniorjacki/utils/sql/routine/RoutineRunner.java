@@ -1,5 +1,7 @@
 package de.juniorjacki.utils.sql.routine;
 
+import de.juniorjacki.utils.Logger;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
@@ -94,7 +96,7 @@ public class RoutineRunner {
     }
 
     private void routineError(Routine routine, Exception e) {
-        System.out.println("Error in routine " + routine + " " + e.getMessage() + " " + e);
+        Logger.error("Error in routine ",routine , e.getMessage(), e);
     }
 
     public int getRegisteredCount() {

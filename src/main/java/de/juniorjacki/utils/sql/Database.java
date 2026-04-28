@@ -60,7 +60,14 @@ public class Database extends Connector implements DatabankHandler {
      @return the active Table instance, or null if the table has not been registered
      */
     public <T extends Table<T,E,R>, E extends Enum<E> & DatabaseProperty, R extends Record & DatabaseRecord<R, E>> T getTable(Class<T> tableClass) {
-        return (T) activeTables.get(tableClass);
+        T result = (T) activeTables.get(tableClass);
+        if (result == null) {
+            try {
+                registerTable(tableClass);
+                result = (T) activeTables.get(tableClass);
+            } catch (Exception e) {}
+        }
+        return result;
     }
 
     /**
@@ -145,6 +152,7 @@ public class Database extends Connector implements DatabankHandler {
         if (isInitiated) {
             routineRunner.stopRoutineExecution();
             closeAllHandledConnections();
+            conPoolHealthService.shutdownNow();
             isInitiated = false;
         }
     }

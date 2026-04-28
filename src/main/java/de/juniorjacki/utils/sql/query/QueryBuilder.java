@@ -1,5 +1,6 @@
 package de.juniorjacki.utils.sql.query;
 
+import de.juniorjacki.utils.Logger;
 import de.juniorjacki.utils.SQL;
 import de.juniorjacki.utils.sql.structure.InterDefinitions;
 import de.juniorjacki.utils.sql.structure.Table;
@@ -111,7 +112,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
 
         /**
          * Sets the condition for the data requested from the database.
-         * This allows filtering the results based on specified conditions.
+         * This allows filtering the results based on specified condition.
          *
          * @param conditionQuery The condition
          * @return The current query instance for method chaining
@@ -125,6 +126,35 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             this.conditionQuery = new ConditionQueryBuilder<>(conditionQuery);
             return (T) this;
         }
+
+
+        /**
+         * Sets the condition for the data requested from the database.
+         * This allows filtering the results based on specified condition.
+         *
+         * @return The current query instance for method chaining
+         * @throws IllegalArgumentException if the conditionQuery is null
+         */
+        @SuppressWarnings("unchecked")
+        public T setSingleCondition(E conditionColumn, InterDefinitions.Operator comparisonOperator, Object conditionValue) {
+           this.conditionQuery = new ConditionQueryBuilder<>(new Condition<>(conditionColumn,comparisonOperator,conditionValue));
+           return (T) this;
+        }
+
+        /**
+         * Sets the condition for the data requested from the database.
+         * This allows filtering the results based on specified condition.
+         *
+         * @return The current query instance for method chaining
+         * @throws IllegalArgumentException if the conditionQuery is null
+         */
+        @SuppressWarnings("unchecked")
+        public T setSingleCondition(E conditionColumn, InterDefinitions.INOperator comparisonOperator, Set<?> conditionValue) {
+            this.conditionQuery = new ConditionQueryBuilder<>(new Condition<>(conditionColumn,comparisonOperator,conditionValue));
+            return (T) this;
+        }
+
+
 
 
         /**
@@ -539,7 +569,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
 
     private static void logQuery(String query) {
         if (SQL.dbQueryLogging) {
-            System.out.println(query);
+            Logger.debug(query);
         }
 
     }
@@ -1138,12 +1168,14 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         }
 
         public Condition(E conditionColumn, InterDefinitions.Operator comparisonOperator, Object conditionValue) {
+            if (comparisonOperator == null || conditionColumn == null) throw new IllegalArgumentException("Condition or Operator cannot be null");
             this.column = conditionColumn;
             this.value = conditionValue;
             this.operator = comparisonOperator;
         }
 
         public Condition(E conditionColumn, InterDefinitions.INOperator comparisonOperator, Set<?> conditionValue) {
+            if (comparisonOperator == null || conditionColumn == null) throw new IllegalArgumentException("Condition or Operator cannot be null");
             this.column = conditionColumn;
             this.operator = comparisonOperator;
             this.value = conditionValue;

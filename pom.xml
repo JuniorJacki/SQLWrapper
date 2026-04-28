@@ -6,7 +6,7 @@
 
     <groupId>de.juniorjacki.utils</groupId>
     <artifactId>sql</artifactId>
-    <version>1.1.8</version>
+    <version>1.2.0</version>
     <name>SQLWrapper</name>
     <url>https://github.com/JuniorJacki/SQLWrapper</url>
     <description>A Java Wrapper for interacting with SQL Databases</description>
@@ -38,6 +38,11 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <version>9.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>de.juniorjacki.utils</groupId>
+            <artifactId>logger</artifactId>
+            <version>0.1.2</version>
         </dependency>
     </dependencies>
 

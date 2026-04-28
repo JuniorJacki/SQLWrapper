@@ -45,7 +45,7 @@ public abstract class Connector {
             initTimestamp = System.currentTimeMillis();
             lastUseTimestamp = initTimestamp;
             dbConnector.activeHandledConnections.add(this);
-            Connector.conPoolHealthService.schedule(this::runHealthCheck,minimumExistenceTime+10000, TimeUnit.MILLISECONDS);
+            dbConnector.conPoolHealthService.schedule(this::runHealthCheck,minimumExistenceTime+10000, TimeUnit.MILLISECONDS);
         }
 
         boolean isFunctional() {
@@ -81,7 +81,7 @@ public abstract class Connector {
         private void runHealthCheck() {
             if (dbConnector.activeHandledConnections.contains(this)) {
                 if (!autoDelete()) {
-                    Connector.conPoolHealthService.schedule(this::runHealthCheck,60000, TimeUnit.MILLISECONDS);
+                    dbConnector.conPoolHealthService.schedule(this::runHealthCheck,60000, TimeUnit.MILLISECONDS);
                 }
             }
         }
@@ -109,7 +109,7 @@ public abstract class Connector {
         }
     }
 
-    static ScheduledExecutorService conPoolHealthService = Executors.newScheduledThreadPool(1);
+    ScheduledExecutorService conPoolHealthService = Executors.newScheduledThreadPool(1);
 
     private CopyOnWriteArrayList<StoredConnection> activeHandledConnections = new CopyOnWriteArrayList<>();
     private ConcurrentLinkedQueue<StoredConnection> availableOpenConnections = new ConcurrentLinkedQueue<>();
