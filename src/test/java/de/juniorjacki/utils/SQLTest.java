@@ -26,12 +26,11 @@ class SQLTest {
             TestTable table = db.getTable(TestTable.class);
             TestTable3 table2 = (TestTable3) db.getTable(TestTable3.class);
 
-            table2.newRowQuery().execute().ifPresent(Logger::info);
 
-            Logger.info(table2.newRowQuery().setCondition(new QueryBuilder.ConditionQueryBuilder<>(new QueryBuilder.Condition<>(TestTable3.Property.uuid, InterDefinitions.Operator.EQUALS,UUID.randomUUID()))).exists());
-            table2.newRowQuery().setCondition(new QueryBuilder.ConditionQueryBuilder<>(new QueryBuilder.Condition<>(TestTable3.Property.age, InterDefinitions.INOperator.IN, Set.of(0,5))).AND(new QueryBuilder.Condition<>(TestTable3.Property.age, InterDefinitions.Operator.EQUALS,5))).exists();
+            table.newColumnQuery(TestTable.Property.preName).execute().forEach(Logger::info);
 
-            Optional<List<?>> age = table2.newColumnQuery(TestTable3.Property.age).execute();
+
+
 
            // table.insert(new TestTable.Test("ente2","kannn",5));
             //table.newColumnQuery(TestTable.Property.surName).update("banane");

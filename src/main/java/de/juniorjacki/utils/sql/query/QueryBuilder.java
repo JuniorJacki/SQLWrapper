@@ -43,26 +43,21 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
      * @param rowData the record containing the data to insert or update
      * @return true if a row was inserted or updated, false otherwise
      */
-    default boolean insert(R rowData) {
-        try {
-            List<E> properties = getInstance().getProperties();
-            String query = String.format("INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s;",
-                    getInstance().tableName(),
-                    properties.stream().map(Enum::name).collect(Collectors.joining(", ")),
-                    properties.stream().map(p -> "?").collect(Collectors.joining(", ")),
-                    properties.stream().map(p -> p.name() + " = VALUES(" + p.name() + ")").collect(Collectors.joining(", "))
-            );
-            logQuery(query);
-            return getInstance().getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
-                try (PreparedStatement prepStatement = connection.prepareStatement(query)) {
-                    InterDefinitions.setParameters(prepStatement, rowData, properties);
-                    return prepStatement.executeUpdate() > 0;
-                }
-            });
-        }  catch (Exception e) {
-            throwDBError(e);
-            return false;
-        }
+    default boolean insert(R rowData) throws Exception {
+        List<E> properties = getInstance().getProperties();
+        String query = String.format("INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s;",
+                getInstance().tableName(),
+                properties.stream().map(Enum::name).collect(Collectors.joining(", ")),
+                properties.stream().map(p -> "?").collect(Collectors.joining(", ")),
+                properties.stream().map(p -> p.name() + " = VALUES(" + p.name() + ")").collect(Collectors.joining(", "))
+        );
+        logQuery(query);
+        return getInstance().getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+            try (PreparedStatement prepStatement = connection.prepareStatement(query)) {
+                InterDefinitions.setParameters(prepStatement, rowData, properties);
+                return prepStatement.executeUpdate() > 0;
+            }
+        });
     }
 
     /**
@@ -355,9 +350,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         /**
          * Executes the query and returns all matching rows as a list of records.
          *
-         * @return An Optional containing the list of records, or empty if an error occurs
+         * @return An list of records, or empty if an error occurs
          */
-        public Optional<List<R>> execute() throws Exception {
+        public List<R> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
             String query = querySet.query.append(";").toString();
             logQuery(query);
@@ -372,11 +367,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                         while (rs.next()) {
                             rows.add((R) DatabaseRecord.populateRecord(table, rs));
                         }
-                        return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                        return rows;
                     }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return Optional.empty();
                 }
             });
         }
@@ -398,9 +390,6 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     return prepStatement.executeUpdate();
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return 0;
                 }
             });
         }
@@ -410,11 +399,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          *
          * @return An Optional containing the first record, or empty if no rows exist or an error occurs
          */
-        public Optional<R> executeOneRow() throws Exception {
+        public R executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().map(List::getFirst);
+                return execute().getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -525,7 +514,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of values for the selected column,
          *         or empty if an error occurs
          */
-        public Optional<List<?>> execute() throws Exception {
+        public List<?> execute() throws Exception {
             QuerySet querySet =buildQueryBase(scopeColumn.name());
             String query = querySet.query.append(";").toString();
             logQuery(query);
@@ -540,11 +529,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                         while (rs.next()) {
                             results.add(InterDefinitions.getTypedValue(rs, scopeColumn));
                         }
-                        return Optional.ofNullable(results.isEmpty() ? null : results);
+                        return results;
                     }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return Optional.empty();
                 }
             });
         }
@@ -556,11 +542,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first value of the selected column,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<?> executeOne() throws Exception {
+        public <T> T executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().map(List::getFirst);
+                return (T) execute().getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -571,7 +557,6 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         if (SQL.dbQueryLogging) {
             Logger.debug(query);
         }
-
     }
 
     private static void logQuery(StringBuilder query) {
@@ -631,18 +616,18 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a list of maps with column values,
          *         or empty if an error occurs
          */
-        public Optional<List<Map<E, ?>>> execute() throws Exception {
+        public List<Map<E, ?>> execute() throws Exception {
             QuerySet querySet =buildQueryBase(String.join(",", returnColumns.stream().map(E::name).toArray(String[]::new)));
             String query = querySet.query.append(";").toString();
             logQuery(query);
-            return (Optional<List<Map<E, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
                     int a = querySet.parameters.size();
                     for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
-                        List<Map<E, Object>> results = new ArrayList<>();
+                        List<Map<E, ?>> results = new ArrayList<>();
                         while (rs.next()) {
                             Map<E, Object> row = new HashMap<>();
                             for (E column : returnColumns) {
@@ -650,11 +635,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                             }
                             results.add(row);
                         }
-                        return Optional.ofNullable(results.isEmpty() ? null : results);
+                        return results;
                     }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return Optional.empty();
                 }
             });
         }
@@ -666,11 +648,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a map with the first row's column values,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Map<E, ?>> executeOne() throws Exception {
+        public Map<E, ?> executeOne() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().map(List::getFirst);
+                return execute().getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -797,18 +779,18 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing a HashMap mapping reference table column values
          *         to binding table column values, or empty if an error occurs
          */
-        public Optional<HashMap<HashMap<E, ?>, HashMap<I, ?>>> execute() throws Exception {
+        public HashMap<HashMap<E, ?>, HashMap<I, ?>> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
             String query = querySet.query.append(";").toString();
             logQuery(query);
-            return (Optional<HashMap<HashMap<E, ?>, HashMap<I, ?>>>) table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
+            return table.getDatabase().getHandledConnection().handleAndCloseWithResult(connection -> {
                 try (var prepStatement = connection.prepareStatement(query)) {
                     int a = querySet.parameters.size();
                     for (int i = 0; i < a; i++) {
                         querySet.parameters.poll().set(prepStatement, i + 1);
                     }
                     try (ResultSet rs = prepStatement.executeQuery()) {
-                        HashMap<HashMap<E, Object>, HashMap<I, Object>> result = new HashMap<>();
+                        HashMap<HashMap<E, ?>, HashMap<I, ?>> result = new HashMap<>();
                         while (rs.next()) {
                             HashMap<E, Object> refRow = new HashMap<>();
                             for (E column : refColumns) {
@@ -820,11 +802,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                             }
                             result.put(refRow, bindingRow);
                         }
-                        return Optional.ofNullable(result.isEmpty() ? null : result);
+                        return result;
                     }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return Optional.empty();
                 }
             });
         }
@@ -835,11 +814,11 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * @return An Optional containing the first map entry of reference table column values
          *         to binding table column values, or empty if no rows exist or an error occurs
          */
-        public Optional<Map.Entry<HashMap<E, ?>, HashMap<I, ?>>> executeOneRow() throws Exception {
+        public Map.Entry<HashMap<E, ?>, HashMap<I, ?>> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().filter(map -> !map.isEmpty()).map(map -> map.entrySet().iterator().next());
+                return execute().entrySet().iterator().next();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -954,10 +933,10 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
         /**
          * Executes the query and returns a map of reference table records to binding table records.
          *
-         * @return An Optional containing a HashMap mapping reference table records to binding table records,
+         * @return A HashMap mapping reference table records to binding table records,
          *         or empty if an error occurs
          */
-        public Optional<HashMap<R, A>> execute() throws Exception {
+        public HashMap<R, A> execute() throws Exception {
             QuerySet querySet =buildQueryBase("*");
             String query = querySet.query.append(";").toString();
             logQuery(query);
@@ -972,11 +951,8 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
                         while (rs.next()) {
                             rows.put((R) DatabaseRecord.populateRecord(refTable, rs, true), (A) DatabaseRecord.populateRecord(this.table, rs, true));
                         }
-                        return Optional.ofNullable(rows.isEmpty() ? null : rows);
+                        return rows;
                     }
-                } catch (Exception e) {
-                    throwDBError(e);
-                    return Optional.empty();
                 }
             });
         }
@@ -985,14 +961,14 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
          * Executes the query and returns the first matching row as a map entry.
          * Optimizes the query by directly applying LIMIT 1.
          *
-         * @return An Optional containing the first map entry of reference table record to binding table record,
+         * @return The first map entry of reference table record to binding table record,
          *         or empty if no rows exist or an error occurs
          */
-        public Optional<Map.Entry<R, A>> executeOneRow() throws Exception {
+        public Map.Entry<R, A> executeOneRow() throws Exception {
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().filter(map -> !map.isEmpty()).map(map -> map.entrySet().iterator().next());
+                return execute().entrySet().iterator().next();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -1183,7 +1159,7 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
 
     }
 
-    private static void throwDBError(Exception e){
+    private static void throwDBError(Exception e) throws Exception{
         throw new RuntimeException(e);
     }
 }

@@ -20,9 +20,7 @@ public class TestTable extends Table<TestTable,TestTable.Property, TestTable.Tes
         return TestTable.Test.class;
     }
 
-    public record Test(String preName, String surName, Integer age) implements DatabaseRecord<Test, Property> {
-
-    }
+    public record Test(String preName, String surName, Integer age) implements DatabaseRecord<Test, Property> {}
     @Override
     public List<Property> getProperties() {
         return Arrays.asList(TestTable.Property.values());
