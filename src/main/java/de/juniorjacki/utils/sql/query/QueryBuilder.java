@@ -403,7 +403,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().getFirst();
+                List<R> results = execute();
+                if (results.isEmpty()) return null;
+                return results.getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -546,7 +548,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return (T) execute().getFirst();
+                List<?> results = execute();
+                if (results.isEmpty()) return null;
+                return (T) results.getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
@@ -652,7 +656,9 @@ public interface QueryBuilder<G extends Table<G,E, R>,  E extends Enum<E> & Data
             int cLimit = limit;
             try {
                 this.limitBy(1);
-                return execute().getFirst();
+                List<Map<E, ?>> results = execute();
+                if (results.isEmpty()) return null;
+                return results.getFirst();
             } finally {
                 this.limitBy(cLimit);
             }
